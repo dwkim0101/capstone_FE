@@ -31,6 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.1.0
+  shared_preferences: ^2.2.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -88,3 +89,45 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+  fonts:
+    - family: SUIT
+      fonts:
+        - asset: assets/fonts/suit/SUIT-Thin.ttf
+          weight: 100
+        - asset: assets/fonts/suit/SUIT-ExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/suit/SUIT-Light.ttf
+          weight: 300
+        - asset: assets/fonts/suit/SUIT-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/suit/SUIT-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/suit/SUIT-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/suit/SUIT-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/suit/SUIT-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/suit/SUIT-Heavy.ttf
+          weight: 900
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/pretendard/Pretendard-Thin.otf
+          weight: 100
+        - asset: assets/fonts/pretendard/Pretendard-ExtraLight.otf
+          weight: 200
+        - asset: assets/fonts/pretendard/Pretendard-Light.otf
+          weight: 300
+        - asset: assets/fonts/pretendard/Pretendard-Regular.otf
+          weight: 400
+        - asset: assets/fonts/pretendard/Pretendard-Medium.otf
+          weight: 500
+        - asset: assets/fonts/pretendard/Pretendard-SemiBold.otf
+          weight: 600
+        - asset: assets/fonts/pretendard/Pretendard-Bold.otf
+          weight: 700
+        - asset: assets/fonts/pretendard/Pretendard-ExtraBold.otf
+          weight: 800
+        - asset: assets/fonts/pretendard/Pretendard-Black.otf
+          weight: 900

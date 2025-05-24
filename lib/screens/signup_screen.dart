@@ -25,6 +25,10 @@ class _SignupScreenState extends State<SignupScreen> {
       _success = null;
     });
     try {
+      print('회원가입 요청: \\${ApiConstants.baseUrl}/join');
+      print(
+        'body: ${jsonEncode({'email': _emailController.text, 'nickname': _nicknameController.text, 'username': _nicknameController.text, 'password': _passwordController.text, 'role': 'USER'})}',
+      );
       final response = await http.post(
         Uri.parse('${ApiConstants.baseUrl}/join'),
         headers: {'Content-Type': 'application/json'},
@@ -36,13 +40,21 @@ class _SignupScreenState extends State<SignupScreen> {
           'role': 'USER',
         }),
       );
+      print('응답 status: \\${response.statusCode}');
+      print('응답 body: ${response.body}');
       if (response.statusCode == 200) {
         setState(() {
           _success = '회원가입이 완료되었습니다!';
         });
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (!mounted) return;
+        Navigator.pop(context, {
+          'email': _emailController.text,
+          'password': _passwordController.text,
+        });
       } else {
         setState(() {
-          _error = '회원가입 실패: ${response.statusCode}';
+          _error = '회원가입 실패: \\${response.statusCode}';
         });
       }
     } catch (e) {
@@ -130,7 +142,13 @@ class _SignupScreenState extends State<SignupScreen> {
                         child:
                             _isLoading
                                 ? CircularProgressIndicator(color: Colors.white)
-                                : Text('회원가입', style: TextStyle(fontSize: 16)),
+                                : Text(
+                                  '회원가입',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
                       ),
                     ),
                     const SizedBox(height: 16),

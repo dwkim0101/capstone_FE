@@ -3,6 +3,8 @@ import '../utils/api_constants.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'signup_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +18,20 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _error;
+  bool _keepLogin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadKeepLogin();
+  }
+
+  Future<void> _loadKeepLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _keepLogin = prefs.getBool('keepLogin') ?? false;
+    });
+  }
 
   Future<void> _login() async {
     setState(() {
@@ -23,6 +39,10 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
+      print('로그인 요청: ${ApiConstants.loginUrl}');
+      print(
+        'body: ${jsonEncode({'email': _emailController.text, 'password': _passwordController.text})}',
+      );
       final response = await http.post(
         Uri.parse(ApiConstants.loginUrl),
         headers: {'Content-Type': 'application/json'},
@@ -31,16 +51,36 @@ class _LoginScreenState extends State<LoginScreen> {
           'password': _passwordController.text,
         }),
       );
+      print('응답 status: ${response.statusCode}');
+      print('응답 body: ${response.body}');
+
       if (response.statusCode == 200) {
-        // TODO: 토큰 저장 및 홈 이동
+        try {
+          final data = jsonDecode(response.body);
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('accessToken', data['accessToken']);
+          await prefs.setString('refreshToken', data['refreshToken']);
+          await prefs.setBool('keepLogin', _keepLogin);
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const SmartAirHome()),
+          );
+        } catch (e) {
+          print('로그인 후처리 에러: $e');
+          setState(() {
+            _error = '로그인 후처리 에러: $e';
+          });
+        }
       } else {
         setState(() {
           _error = '로그인 실패: ${response.statusCode}';
         });
       }
     } catch (e) {
+      print('네트워크 오류: $e');
       setState(() {
-        _error = '네트워크 오류';
+        _error = '네트워크 오류: $e';
       });
     } finally {
       setState(() {
@@ -77,10 +117,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     Image.asset('assets/logo.png', width: 80, height: 80),
                     const SizedBox(height: 16),
                     Text(
-                      'SmartAir 로그인',
+                      'SMARTAIR 로그인',
                       style: TextStyle(
                         fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                         color: Color(0xFF2241C6),
                       ),
                     ),
@@ -100,6 +140,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(_error!, style: TextStyle(color: Colors.red)),
                     ],
                     const SizedBox(height: 32),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _keepLogin,
+                          onChanged: (val) {
+                            setState(() {
+                              _keepLogin = val ?? false;
+                            });
+                          },
+                        ),
+                        const Text('로그인 유지'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -114,18 +168,29 @@ class _LoginScreenState extends State<LoginScreen> {
                         child:
                             _isLoading
                                 ? CircularProgressIndicator(color: Colors.white)
-                                : Text('로그인', style: TextStyle(fontSize: 16)),
+                                : Text(
+                                  '로그인',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
+
                     TextButton(
-                      onPressed: () {
-                        Navigator.push(
+                      onPressed: () async {
+                        final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => const SignupScreen(),
                           ),
                         );
+                        if (result is Map) {
+                          _emailController.text = result['email'] ?? '';
+                          _passwordController.text = result['password'] ?? '';
+                        }
                       },
                       child: const Text(
                         '회원가입',
