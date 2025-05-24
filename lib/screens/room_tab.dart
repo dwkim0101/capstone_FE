@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/api_constants.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'room_detail_screen.dart';
 import 'room_add_screen.dart';
 import '../models/room.dart';
@@ -26,21 +25,32 @@ class RoomTab extends StatefulWidget {
 }
 
 class _RoomTabState extends State<RoomTab> {
-  late Future<List<Room>> _roomFuture;
+  bool _loading = true;
+
   @override
   void initState() {
     super.initState();
-    _roomFuture = fetchRoomList();
+    _fetchRooms();
   }
 
-  void _refresh() {
-    setState(() {
-      _roomFuture = fetchRoomList();
-    });
+  Future<void> _fetchRooms() async {
+    setState(() => _loading = true);
+    final res = await authorizedRequest(
+      'GET',
+      Uri.parse(ApiConstants.roomList),
+    );
+    if (res.statusCode == 200) {
+      setState(() => _loading = false);
+    } else {
+      setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -55,12 +65,12 @@ class _RoomTabState extends State<RoomTab> {
             context,
             MaterialPageRoute(builder: (_) => const RoomAddScreen()),
           );
-          if (result == true) _refresh();
+          if (result == true) _fetchRooms();
         },
         child: const Icon(Icons.add),
       ),
       body: FutureBuilder<List<Room>>(
-        future: _roomFuture,
+        future: fetchRoomList(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -81,7 +91,7 @@ class _RoomTabState extends State<RoomTab> {
                       foregroundColor: Colors.white,
                       backgroundColor: Colors.blue,
                     ),
-                    onPressed: _refresh,
+                    onPressed: _fetchRooms,
                     child: const Text('다시 시도'),
                   ),
                 ],
@@ -120,7 +130,7 @@ class _RoomTabState extends State<RoomTab> {
                           builder: (_) => RoomDetailScreen(room: room),
                         ),
                       );
-                      if (result == true) _refresh();
+                      if (result == true) _fetchRooms();
                     },
                   ),
                 );

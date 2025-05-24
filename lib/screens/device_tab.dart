@@ -64,26 +64,114 @@ class DeviceTab extends StatefulWidget {
   State<DeviceTab> createState() => _DeviceTabState();
 }
 
-class _DeviceTabState extends State<DeviceTab> {
+class _DeviceTabState extends State<DeviceTab>
+    with AutomaticKeepAliveClientMixin {
+  List<dynamic> _rooms = [];
   int? _selectedRoomId;
-  late Future<List<Room>> _roomFuture;
-  Future<List<Device>>? _deviceFuture;
+  bool _loading = true;
+  List<Device> _devices = [];
 
   @override
   void initState() {
     super.initState();
-    _roomFuture = fetchRoomList();
+    _fetchRooms();
   }
 
-  void _onRoomSelected(int roomId) {
+  Future<void> _fetchRooms() async {
+    setState(() => _loading = true);
+    final res = await authorizedRequest(
+      'GET',
+      Uri.parse(ApiConstants.roomList),
+    );
+    if (res.statusCode == 200) {
+      final rooms = json.decode(res.body);
+      setState(() {
+        _rooms = rooms;
+        if (rooms.isNotEmpty) {
+          _selectedRoomId = rooms[0]['id'];
+          _fetchDevices();
+        }
+        _loading = false;
+      });
+    } else {
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _fetchDevices() async {
+    if (_selectedRoomId == null) return;
+    final res = await authorizedRequest(
+      'GET',
+      Uri.parse(ApiConstants.deviceList(_selectedRoomId!)),
+    );
+    if (res.statusCode == 200) {
+      final List data = json.decode(res.body);
+      setState(() {
+        _devices = data.map((e) => Device.fromJson(e)).toList();
+      });
+    }
+  }
+
+  void _onRoomSelected(int? roomId) {
+    if (roomId == null) return;
     setState(() {
       _selectedRoomId = roomId;
-      _deviceFuture = fetchDeviceList(roomId);
+      _fetchDevices();
     });
   }
 
+  Future<void> _showAddDeviceDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('기기 추가'),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(hintText: '기기명 입력'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, controller.text),
+                child: const Text('추가'),
+              ),
+            ],
+          ),
+    );
+    if (result != null && result.trim().isNotEmpty && _selectedRoomId != null) {
+      await _addDevice(result.trim(), _selectedRoomId!);
+      await _fetchDevices();
+    }
+  }
+
+  Future<void> _addDevice(String name, int roomId) async {
+    final res = await authorizedRequest(
+      'POST',
+      Uri.parse('${ApiConstants.apiBase}/device/add'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'name': name, 'roomId': roomId}),
+    );
+    if (res.statusCode != 200) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('기기 추가 실패')));
+    }
+  }
+
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -92,111 +180,73 @@ class _DeviceTabState extends State<DeviceTab> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: FutureBuilder<List<Room>>(
-        future: _roomFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                '방 목록을 불러올 수 없습니다.',
-                style: TextStyle(color: Colors.white),
-              ),
-            );
-          } else if (snapshot.hasData) {
-            final rooms = snapshot.data!;
-            return Column(
-              children: [
-                DropdownButton<int>(
-                  value: _selectedRoomId,
-                  hint: const Text(
-                    '방 선택',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  dropdownColor: Colors.black,
-                  items:
-                      rooms
-                          .map(
-                            (room) => DropdownMenuItem(
-                              value: room.id,
-                              child: Text(
-                                room.name,
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (roomId) {
-                    if (roomId != null) _onRoomSelected(roomId);
-                  },
-                ),
-                if (_selectedRoomId != null && _deviceFuture != null)
-                  Expanded(
-                    child: FutureBuilder<List<Device>>(
-                      future: _deviceFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        } else if (snapshot.hasError) {
-                          return Center(
-                            child: Text(
-                              '기기 목록을 불러올 수 없습니다.',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          );
-                        } else if (snapshot.hasData) {
-                          final devices = snapshot.data!;
-                          if (devices.isEmpty) {
-                            return const Center(
-                              child: Text(
-                                '등록된 기기가 없습니다.',
-                                style: TextStyle(color: Colors.white70),
-                              ),
-                            );
-                          }
-                          return ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: devices.length,
-                            itemBuilder: (context, i) {
-                              final device = devices[i];
-                              return Card(
-                                color: Colors.blue,
-                                child: ListTile(
-                                  leading: const Icon(
-                                    Icons.air,
-                                    color: Colors.white,
-                                  ),
-                                  title: Text(
-                                    device.alias,
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        } else {
-                          return const Center(
-                            child: Text(
-                              '알 수 없는 오류',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          );
-                        }
-                      },
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddDeviceDialog,
+        child: const Icon(Icons.add),
+      ),
+      body: Column(
+        children: [
+          if (_rooms.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '현재 방: \\${_rooms.firstWhere((r) => r['id'] == _selectedRoomId, orElse: () => null)?['name'] ?? '-'}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
-              ],
-            );
-          } else {
-            return const Center(
-              child: Text('알 수 없는 오류', style: TextStyle(color: Colors.white)),
-            );
-          }
-        },
+                  const SizedBox(height: 4),
+                  DropdownButton<int>(
+                    value: _selectedRoomId,
+                    isExpanded: true,
+                    dropdownColor: Colors.black,
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                    items:
+                        _rooms.map<DropdownMenuItem<int>>((room) {
+                          return DropdownMenuItem(
+                            value: room['id'],
+                            child: Text(room['name']),
+                          );
+                        }).toList(),
+                    onChanged: _onRoomSelected,
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                '방을 먼저 추가하세요.',
+                style: TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+            ),
+          if (_selectedRoomId != null && _devices.isNotEmpty)
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _devices.length,
+                itemBuilder: (context, i) {
+                  final device = _devices[i];
+                  return Card(
+                    color: Colors.blue,
+                    child: ListTile(
+                      leading: const Icon(Icons.air, color: Colors.white),
+                      title: Text(
+                        device.alias,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -42,16 +42,24 @@ class SmartAirBottomNavBar extends StatelessWidget {
             onTap: () => onTap(1),
           ),
           _NavItem(
-            icon: 'assets/stats.svg',
-            label: '통계',
+            icon: 'assets/Room.svg',
+            label: '방',
             selected: currentIndex == 2,
             onTap: () => onTap(2),
+            useMaterialIconIfNotFound: true,
+            materialIcon: Icons.meeting_room,
+          ),
+          _NavItem(
+            icon: 'assets/stats.svg',
+            label: '통계',
+            selected: currentIndex == 3,
+            onTap: () => onTap(3),
           ),
           _NavItem(
             icon: 'assets/mypage.svg',
             label: '마이',
-            selected: currentIndex == 3,
-            onTap: () => onTap(3),
+            selected: currentIndex == 4,
+            onTap: () => onTap(4),
           ),
         ],
       ),
@@ -64,15 +72,35 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final bool useMaterialIconIfNotFound;
+  final IconData? materialIcon;
   const _NavItem({
     required this.icon,
     required this.label,
     required this.selected,
     required this.onTap,
+    this.useMaterialIconIfNotFound = false,
+    this.materialIcon,
   });
 
   @override
   Widget build(BuildContext context) {
+    Widget iconWidget;
+    if (useMaterialIconIfNotFound && materialIcon != null) {
+      iconWidget = Icon(
+        materialIcon,
+        color: selected ? Colors.white : Colors.white54,
+        size: 24,
+      );
+    } else {
+      iconWidget = SvgPicture.asset(
+        icon,
+        width: 24,
+        height: 24,
+        fit: BoxFit.contain,
+        color: selected ? Colors.white : Colors.white54,
+      );
+    }
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -94,13 +122,7 @@ class _NavItem extends StatelessWidget {
                     )
                     : null,
             padding: const EdgeInsets.all(8),
-            child: SvgPicture.asset(
-              icon,
-              width: 24,
-              height: 24,
-              fit: BoxFit.contain,
-              color: selected ? Colors.white : Colors.white54,
-            ),
+            child: iconWidget,
           ),
           const SizedBox(height: 2),
           Text(

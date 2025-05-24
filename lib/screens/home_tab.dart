@@ -26,10 +26,10 @@ class Score {
       Score(value: json['score'] ?? 0, status: json['status'] ?? '');
 }
 
-Future<Score> fetchTodayScore() async {
+Future<Score> fetchRoomScore(int roomId) async {
   final res = await authorizedRequest(
     'GET',
-    Uri.parse(ApiConstants.todayScore),
+    Uri.parse(ApiConstants.roomScore(roomId)),
   );
   if (res.statusCode == 200) {
     return Score.fromJson(json.decode(res.body));
@@ -38,10 +38,10 @@ Future<Score> fetchTodayScore() async {
   }
 }
 
-Future<List<Device>> fetchDeviceList() async {
+Future<List<Device>> fetchDeviceList(int roomId) async {
   final res = await authorizedRequest(
     'GET',
-    Uri.parse(ApiConstants.deviceListAll),
+    Uri.parse(ApiConstants.deviceList(roomId)),
   );
   if (res.statusCode == 200) {
     final List data = json.decode(res.body);
@@ -71,9 +71,12 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
+  List<dynamic> _rooms = [];
+  int? _selectedRoomId;
+  Map<String, dynamic>? _user;
   late AnimationController _controller;
-  late Future<Score> _scoreFuture;
-  late Future<List<Device>> _deviceFuture;
+  Future<Score>? _scoreFuture;
+  Future<List<Device>>? _deviceFuture;
 
   @override
   void initState() {
@@ -82,15 +85,55 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
-    _scoreFuture = fetchTodayScore();
-    _deviceFuture = fetchDeviceList();
+    _fetchRoomsAndInit();
+    _fetchUser();
   }
 
-  void _refresh() {
+  Future<void> _fetchRoomsAndInit() async {
+    final res = await authorizedRequest(
+      'GET',
+      Uri.parse(ApiConstants.roomList),
+    );
+    if (res.statusCode == 200) {
+      final rooms = json.decode(res.body);
+      setState(() {
+        _rooms = rooms;
+        if (rooms.isNotEmpty) {
+          _selectedRoomId = rooms[0]['id'];
+          _refreshRoomData();
+        }
+      });
+    }
+  }
+
+  void _onRoomSelected(int? roomId) {
+    if (roomId == null) return;
     setState(() {
-      _scoreFuture = fetchTodayScore();
-      _deviceFuture = fetchDeviceList();
+      _selectedRoomId = roomId;
+      _refreshRoomData();
     });
+  }
+
+  void _refreshRoomData() {
+    if (_selectedRoomId == null) return;
+    _scoreFuture = fetchRoomScore(_selectedRoomId!);
+    _deviceFuture = fetchDeviceList(_selectedRoomId!);
+  }
+
+  Future<void> _fetchUser() async {
+    try {
+      final res = await authorizedRequest(
+        'GET',
+        Uri.parse(ApiConstants.userInfo),
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _user = json.decode(res.body);
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
   @override
@@ -153,51 +196,53 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                   style: TextStyle(fontSize: 14, color: Colors.white),
                 ),
                 const SizedBox(height: 8),
-                FutureBuilder<Score>(
-                  future: _scoreFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const CircularProgressIndicator();
-                    } else if (snapshot.hasError) {
-                      return Text('점수 오류: ${snapshot.error}');
-                    } else if (snapshot.hasData) {
-                      final score = snapshot.data!;
-                      return Text(
-                        score.value.toString(),
-                        style: const TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      );
-                    } else {
-                      return const SizedBox();
-                    }
-                  },
-                ),
+                if (_scoreFuture != null)
+                  FutureBuilder<Score>(
+                    future: _scoreFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const CircularProgressIndicator();
+                      } else if (snapshot.hasError) {
+                        return Text('점수 오류: \\${snapshot.error}');
+                      } else if (snapshot.hasData) {
+                        final score = snapshot.data!;
+                        return Text(
+                          score.value.toString(),
+                          style: const TextStyle(
+                            fontSize: 48,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        );
+                      } else {
+                        return const SizedBox();
+                      }
+                    },
+                  ),
                 const SizedBox(height: 8),
-                FutureBuilder<Score>(
-                  future: _scoreFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const CircularProgressIndicator();
-                    } else if (snapshot.hasError) {
-                      return Text('점수 오류: ${snapshot.error}');
-                    } else if (snapshot.hasData) {
-                      final score = snapshot.data!;
-                      return Text(
-                        score.status,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      );
-                    } else {
-                      return const SizedBox();
-                    }
-                  },
-                ),
+                if (_scoreFuture != null)
+                  FutureBuilder<Score>(
+                    future: _scoreFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const CircularProgressIndicator();
+                      } else if (snapshot.hasError) {
+                        return Text('점수 오류: \\${snapshot.error}');
+                      } else if (snapshot.hasData) {
+                        final score = snapshot.data!;
+                        return Text(
+                          score.status,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      } else {
+                        return const SizedBox();
+                      }
+                    },
+                  ),
               ],
             ),
           ),
@@ -229,78 +274,100 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                   ),
                 ),
                 const SizedBox(height: 24),
-                // 인사말 (임시)
+                // 방 선택 드롭다운
+                if (_rooms.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: DropdownButton<int>(
+                      value: _selectedRoomId,
+                      dropdownColor: Colors.black,
+                      style: const TextStyle(color: Colors.white),
+                      items:
+                          _rooms.map<DropdownMenuItem<int>>((room) {
+                            return DropdownMenuItem(
+                              value: room['id'],
+                              child: Text(
+                                room['name'],
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            );
+                          }).toList(),
+                      onChanged: _onRoomSelected,
+                    ),
+                  ),
+                // 인사말
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: RichText(
-                    text: const TextSpan(
+                    text: TextSpan(
                       text: '안녕하세요. ',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
                       children: [
                         TextSpan(
-                          text: '유저님',
-                          style: TextStyle(color: Color(0xFF3971FF)),
+                          text: _user?['username'] ?? '유저님',
+                          style: const TextStyle(color: Color(0xFF3971FF)),
                         ),
-                        TextSpan(text: '\n오늘의 점수를 확인하세요.'),
+                        const TextSpan(text: '\n오늘의 점수를 확인하세요.'),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
                 // 기기 카드
-                FutureBuilder<List<Device>>(
-                  future: _deviceFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Text('기기 오류: ${snapshot.error}');
-                    } else if (snapshot.hasData) {
-                      final devices = snapshot.data!;
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children:
-                            devices.map((device) {
-                              return GestureDetector(
-                                onTap: () async {
-                                  await toggleDevice(
-                                    device.id,
-                                    !device.isActive,
-                                  );
-                                  _refresh();
-                                },
-                                child: Card(
-                                  color:
-                                      device.isActive
-                                          ? Colors.blue
-                                          : Colors.grey,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      children: [
-                                        Icon(Icons.air, color: Colors.white),
-                                        Text(
-                                          device.name,
-                                          style: const TextStyle(
-                                            color: Colors.white,
+                if (_deviceFuture != null)
+                  FutureBuilder<List<Device>>(
+                    future: _deviceFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return Text('기기 오류: \\${snapshot.error}');
+                      } else if (snapshot.hasData) {
+                        final devices = snapshot.data!;
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children:
+                              devices.map((device) {
+                                return GestureDetector(
+                                  onTap: () async {
+                                    await toggleDevice(
+                                      device.id,
+                                      !device.isActive,
+                                    );
+                                    _refreshRoomData();
+                                  },
+                                  child: Card(
+                                    color:
+                                        device.isActive
+                                            ? Colors.blue
+                                            : Colors.grey,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Column(
+                                        children: [
+                                          Icon(Icons.air, color: Colors.white),
+                                          Text(
+                                            device.name,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              );
-                            }).toList(),
-                      );
-                    } else {
-                      return const SizedBox();
-                    }
-                  },
-                ),
+                                );
+                              }).toList(),
+                        );
+                      } else {
+                        return const SizedBox();
+                      }
+                    },
+                  ),
               ],
             ),
           ),
