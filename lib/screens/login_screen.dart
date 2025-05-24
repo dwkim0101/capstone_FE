@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'signup_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screen.dart';
+import '../utils/api_client.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -39,20 +40,21 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      print('로그인 요청: ${ApiConstants.loginUrl}');
+      print('로그인 요청: \\${ApiConstants.login}');
       print(
-        'body: ${jsonEncode({'email': _emailController.text, 'password': _passwordController.text})}',
+        'body: \\${jsonEncode({'email': _emailController.text, 'password': _passwordController.text})}',
       );
-      final response = await http.post(
-        Uri.parse(ApiConstants.loginUrl),
+      final response = await authorizedRequest(
+        'POST',
+        Uri.parse(ApiConstants.login),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': _emailController.text,
           'password': _passwordController.text,
         }),
       );
-      print('응답 status: ${response.statusCode}');
-      print('응답 body: ${response.body}');
+      print('응답 status: \\${response.statusCode}');
+      print('응답 body: \\${response.body}');
 
       if (response.statusCode == 200) {
         try {
@@ -74,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else {
         setState(() {
-          _error = '로그인 실패: ${response.statusCode}';
+          _error = '로그인 실패: \\${response.statusCode}';
         });
       }
     } catch (e) {
@@ -95,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0D1A4F), Color(0xFF19398A)],
+            colors: [Color(0xFF0D1A4F), Color(0xFF23272F)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -103,6 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Center(
           child: SingleChildScrollView(
             child: Card(
+              color: const Color(0xFF23272F),
               elevation: 12,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
@@ -120,26 +123,50 @@ class _LoginScreenState extends State<LoginScreen> {
                       'SMARTAIR 로그인',
                       style: TextStyle(
                         fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF2241C6),
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 24),
                     TextField(
                       controller: _emailController,
-                      decoration: InputDecoration(labelText: '이메일'),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: '이메일',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white24),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white54),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        fillColor: Colors.white10,
+                        filled: true,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _passwordController,
-                      decoration: InputDecoration(labelText: '비밀번호'),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: '비밀번호',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white24),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white54),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        fillColor: Colors.white10,
+                        filled: true,
+                      ),
                       obscureText: true,
                     ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 16),
-                      Text(_error!, style: TextStyle(color: Colors.red)),
-                    ],
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Checkbox(
@@ -149,16 +176,26 @@ class _LoginScreenState extends State<LoginScreen> {
                               _keepLogin = val ?? false;
                             });
                           },
+                          activeColor: const Color(0xFF3971FF),
+                          checkColor: Colors.white,
                         ),
-                        const Text('로그인 유지'),
+                        const Text(
+                          '로그인 유지',
+                          style: TextStyle(color: Colors.white70),
+                        ),
                       ],
                     ),
+                    // const SizedBox(height: 16),
+                    if (_error != null) ...[
+                      const SizedBox(height: 16),
+                      Text(_error!, style: TextStyle(color: Colors.redAccent)),
+                    ],
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF3971FF),
+                          backgroundColor: const Color(0xFF3971FF),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -167,8 +204,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _isLoading ? null : _login,
                         child:
                             _isLoading
-                                ? CircularProgressIndicator(color: Colors.white)
-                                : Text(
+                                ? SizedBox(
+                                  height: 16,
+                                  child: const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  ),
+                                )
+                                : const Text(
                                   '로그인',
                                   style: TextStyle(
                                     fontSize: 16,
@@ -178,7 +220,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-
                     TextButton(
                       onPressed: () async {
                         final result = await Navigator.push(
@@ -194,7 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                       child: const Text(
                         '회원가입',
-                        style: TextStyle(color: Color(0xFF3971FF)),
+                        style: TextStyle(color: Color(0xFF4FC3F7)),
                       ),
                     ),
                   ],

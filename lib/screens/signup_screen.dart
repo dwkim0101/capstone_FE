@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/api_constants.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../utils/api_client.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -29,7 +30,8 @@ class _SignupScreenState extends State<SignupScreen> {
       print(
         'body: ${jsonEncode({'email': _emailController.text, 'nickname': _nicknameController.text, 'username': _nicknameController.text, 'password': _passwordController.text, 'role': 'USER'})}',
       );
-      final response = await http.post(
+      final response = await authorizedRequest(
+        'POST',
         Uri.parse('${ApiConstants.baseUrl}/join'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -74,7 +76,7 @@ class _SignupScreenState extends State<SignupScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0D1A4F), Color(0xFF19398A)],
+            colors: [Color(0xFF0D1A4F), Color(0xFF23272F)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -82,6 +84,7 @@ class _SignupScreenState extends State<SignupScreen> {
         child: Center(
           child: SingleChildScrollView(
             child: Card(
+              color: const Color(0xFF23272F),
               elevation: 12,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
@@ -100,38 +103,84 @@ class _SignupScreenState extends State<SignupScreen> {
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2241C6),
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 24),
                     TextField(
                       controller: _emailController,
-                      decoration: InputDecoration(labelText: '이메일'),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: '이메일',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white24),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white54),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        fillColor: Colors.white10,
+                        filled: true,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _nicknameController,
-                      decoration: InputDecoration(labelText: '닉네임'),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: '닉네임',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white24),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white54),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        fillColor: Colors.white10,
+                        filled: true,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _passwordController,
-                      decoration: InputDecoration(labelText: '비밀번호'),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: '비밀번호',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white24),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white54),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        fillColor: Colors.white10,
+                        filled: true,
+                      ),
                       obscureText: true,
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 16),
-                      Text(_error!, style: TextStyle(color: Colors.red)),
+                      Text(_error!, style: TextStyle(color: Colors.redAccent)),
                     ],
                     if (_success != null) ...[
                       const SizedBox(height: 16),
-                      Text(_success!, style: TextStyle(color: Colors.green)),
+                      Text(
+                        _success!,
+                        style: TextStyle(color: Colors.greenAccent),
+                      ),
                     ],
                     const SizedBox(height: 32),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
                           backgroundColor: Color(0xFF3971FF),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
@@ -141,8 +190,10 @@ class _SignupScreenState extends State<SignupScreen> {
                         onPressed: _isLoading ? null : _signup,
                         child:
                             _isLoading
-                                ? CircularProgressIndicator(color: Colors.white)
-                                : Text(
+                                ? const CircularProgressIndicator(
+                                  color: Colors.white,
+                                )
+                                : const Text(
                                   '회원가입',
                                   style: TextStyle(
                                     fontSize: 16,
@@ -158,7 +209,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       },
                       child: const Text(
                         '로그인으로 돌아가기',
-                        style: TextStyle(color: Color(0xFF3971FF)),
+                        style: TextStyle(color: Color(0xFF4FC3F7)),
                       ),
                     ),
                   ],

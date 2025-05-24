@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'utils/api_constants.dart';
+import 'utils/api_client.dart';
 
 void main() {
   runApp(const MyApp());
@@ -64,8 +65,9 @@ class _SplashScreenState extends State<SplashScreen> {
     final refreshToken = prefs.getString('refreshToken');
     if (keepLogin && refreshToken != null && refreshToken.isNotEmpty) {
       try {
-        final response = await http.post(
-          Uri.parse(ApiConstants.reissueUrl),
+        final response = await authorizedRequest(
+          'POST',
+          Uri.parse(ApiConstants.reissue),
           headers: {'Content-Type': 'application/json'},
         );
         if (response.statusCode == 200) {
