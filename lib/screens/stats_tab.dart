@@ -8,6 +8,8 @@ import '../utils/api_client.dart';
 import 'package:flutter/rendering.dart';
 import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
+import '../widgets/statistics_charts.dart';
+import 'login_screen.dart';
 
 class StatsTab extends StatefulWidget {
   const StatsTab({super.key});
@@ -23,7 +25,7 @@ class _StatsTabState extends State<StatsTab>
   bool _loading = true;
   Map<String, dynamic>? _stats;
   String? _selectedSensorSerial;
-  Future<List<Sensor>>? _sensorFuture;
+  Future<List<Sensor>?>? _sensorFuture;
 
   // 외부 공기질 상태
   Map<String, dynamic>? _externalAirQuality;
@@ -41,42 +43,77 @@ class _StatsTabState extends State<StatsTab>
 
   Future<void> _fetchRooms() async {
     setState(() => _loading = true);
-    final res = await authorizedRequest(
-      'GET',
-      Uri.parse(ApiConstants.roomList),
-    );
-    if (res.statusCode == 200) {
-      final List data = json.decode(res.body);
-      setState(() {
-        _rooms = data.map((e) => Room.fromJson(e)).toList();
-        if (_rooms.isNotEmpty) {
-          final validIds = _rooms.map((r) => r.id).toSet();
-          if (_selectedRoomId == null || !validIds.contains(_selectedRoomId)) {
-            _selectedRoomId = _rooms[0].id;
+    try {
+      final res = await authorizedRequest(
+        'GET',
+        Uri.parse(ApiConstants.roomList),
+        onAuthFail: () {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        },
+      );
+      if (res != null && res.statusCode == 200) {
+        final List data = json.decode(res.body);
+        setState(() {
+          _rooms = data.map((e) => Room.fromJson(e)).toList();
+          if (_rooms.isNotEmpty) {
+            final validIds = _rooms.map((r) => r.id).toSet();
+            if (_selectedRoomId == null ||
+                !validIds.contains(_selectedRoomId)) {
+              _selectedRoomId = _rooms[0].id;
+            }
+            _sensorFuture = fetchSensorList(
+              _selectedRoomId!,
+              onAuthFail: () {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              },
+            );
+            _fetchRoomLatestScore();
+          } else {
+            _selectedRoomId = null;
+            _sensorFuture = null;
           }
-          _sensorFuture = fetchSensorList(_selectedRoomId!);
-          _fetchRoomLatestScore();
-        } else {
-          _selectedRoomId = null;
-          _sensorFuture = null;
-        }
-        _loading = false;
-      });
-    } else {
-      setState(() => _loading = false);
+          _loading = false;
+        });
+      } else {
+        setState(() => _loading = false);
+      }
+    } catch (e) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     }
   }
 
   Future<void> _fetchRoomLatestScore() async {
     if (_selectedRoomId == null) return;
-    final res = await authorizedRequest(
-      'GET',
-      Uri.parse(ApiConstants.roomLatestScore(_selectedRoomId!)),
-    );
-    if (res.statusCode == 200) {
-      setState(() {
-        _stats = json.decode(res.body);
-      });
+    try {
+      final res = await authorizedRequest(
+        'GET',
+        Uri.parse(ApiConstants.roomLatestScore(_selectedRoomId!)),
+        onAuthFail: () {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        },
+      );
+      if (res != null && res.statusCode == 200) {
+        setState(() {
+          _stats = json.decode(res.body);
+        });
+      }
+    } catch (e) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     }
   }
 
@@ -121,15 +158,22 @@ class _StatsTabState extends State<StatsTab>
     if (roomId == null) return;
     setState(() {
       _selectedRoomId = roomId;
-      _sensorFuture = fetchSensorList(roomId);
+      _selectedSensorSerial = null;
+      _sensorFuture = fetchSensorList(
+        roomId,
+        onAuthFail: () {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        },
+      );
       _fetchRoomLatestScore();
       final Room? room = _findRoomById(_rooms, roomId);
       if (room != null && room.latitude != null && room.longitude != null) {
         _fetchExternalAirQuality(room.latitude, room.longitude);
       } else {
-        setState(() {
-          _externalAirQuality = null;
-        });
+        _externalAirQuality = null;
       }
     });
   }
@@ -140,10 +184,309 @@ class _StatsTabState extends State<StatsTab>
     });
   }
 
-  Widget _buildAirQualityBarChart(
-    Map<String, dynamic> indoor,
-    Map<String, dynamic> outdoor,
-  ) {
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return DefaultTabController(
+      length: 8,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          title: const Text('통계', style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
+          bottom: const TabBar(
+            isScrollable: true,
+            indicatorColor: Colors.blueAccent,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white54,
+            tabs: [
+              Tab(text: '종합'),
+              Tab(text: '실내/실외'),
+              Tab(text: '시간별'),
+              Tab(text: '일별'),
+              Tab(text: '주간'),
+              Tab(text: '이상치'),
+              Tab(text: '예측'),
+              Tab(text: '만족도'),
+            ],
+          ),
+        ),
+        body:
+            _loading
+                ? const Center(
+                  child: Text(
+                    '조회중 ...',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                )
+                : _rooms.isEmpty
+                ? Center(
+                  child: Card(
+                    color: Colors.grey[900],
+                    margin: const EdgeInsets.all(32),
+                    child: const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Text(
+                        '방을 먼저 추가하세요.',
+                        style: TextStyle(color: Colors.white70, fontSize: 18),
+                      ),
+                    ),
+                  ),
+                )
+                : TabBarView(
+                  children: [
+                    // 1. 종합 탭: 방/센서 선택 + 모든 차트 세로 배치
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 방 선택 드롭다운
+                          _buildRoomDropdown(),
+                          const SizedBox(height: 8),
+                          // 센서 선택 드롭다운
+                          if (_sensorFuture != null)
+                            FutureBuilder<List<Sensor>?>(
+                              future: _sensorFuture,
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 8),
+                                    child: Text(
+                                      '센서 조회중 ...',
+                                      style: TextStyle(color: Colors.white70),
+                                    ),
+                                  );
+                                } else if (snapshot.hasError) {
+                                  return const Text(
+                                    '센서 목록을 불러올 수 없습니다.',
+                                    style: TextStyle(color: Colors.redAccent),
+                                  );
+                                } else if (snapshot.hasData &&
+                                    snapshot.data!.isNotEmpty) {
+                                  final sensors = snapshot.data!;
+                                  return _buildSensorDropdown(sensors);
+                                } else {
+                                  return const Text(
+                                    '센서 없음',
+                                    style: TextStyle(color: Colors.white70),
+                                  );
+                                }
+                              },
+                            ),
+                          const SizedBox(height: 16),
+                          // 실내/실외 비교
+                          _buildChartCard(
+                            title: '실내/실외 공기질 비교',
+                            description:
+                                '실내 센서 점수와 실외(OpenWeatherMap) 공기질(PM2.5, PM10, CO2, TVOC) 비교',
+                            child: Column(
+                              children: [
+                                _buildIndoorOutdoorLegend(),
+                                const SizedBox(height: 8),
+                                Expanded(child: _buildIndoorOutdoorChart()),
+                              ],
+                            ),
+                          ),
+                          // 시간별 트렌드
+                          _buildChartCard(
+                            title: '시간별 트렌드',
+                            description: '선택한 센서의 최근 24시간 점수 변화(2시간 단위)',
+                            child: _buildHourlyChart(),
+                          ),
+                          // 일별 트렌드
+                          _buildChartCard(
+                            title: '일별 트렌드',
+                            description: '선택한 센서의 최근 7일간 일평균 점수 변화',
+                            child: _buildDailyChart(),
+                          ),
+                          // 주간 트렌드
+                          _buildChartCard(
+                            title: '주간 트렌드',
+                            description: '선택한 센서의 최근 7주간 주평균 점수 변화',
+                            child: _buildWeeklyChart(),
+                          ),
+                          // 이상치 감지
+                          _buildChartCard(
+                            title: '이상치 감지',
+                            description: '최근 7일간 점수 중 급격한 변화(이상치) 구간을 강조 표시',
+                            child: _buildOutlierChart(),
+                          ),
+                          // 예측
+                          _buildChartCard(
+                            title: '예측',
+                            description:
+                                'AI 기반 예측: 향후 5일간 점수 예측(실선: 실제, 점선: 예측)',
+                            child: _buildPredictionChart(),
+                          ),
+                          // 만족도
+                          _buildChartCard(
+                            title: '만족도',
+                            description: '사용자 만족도 설문 결과(만족/보통/불만 비율)',
+                            child: _buildSatisfactionChart(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // 2. 실내/실외 비교
+                    _buildChartTab(_buildIndoorOutdoorChart(), '실내/실외 공기질 비교'),
+                    // 3. 시간별
+                    _buildChartTab(_buildHourlyChart(), '시간별 트렌드'),
+                    // 4. 일별
+                    _buildChartTab(_buildDailyChart(), '일별 트렌드'),
+                    // 5. 주간
+                    _buildChartTab(_buildWeeklyChart(), '주간 트렌드'),
+                    // 6. 이상치
+                    _buildChartTab(_buildOutlierChart(), '이상치 감지'),
+                    // 7. 예측
+                    _buildChartTab(_buildPredictionChart(), '예측'),
+                    // 8. 만족도
+                    _buildChartTab(_buildSatisfactionChart(), '만족도'),
+                  ],
+                ),
+      ),
+    );
+  }
+
+  // --- UI 빌더 함수들 ---
+
+  Widget _buildRoomDropdown() {
+    return DropdownButton<int>(
+      value: _selectedRoomId,
+      isExpanded: true,
+      dropdownColor: Colors.black,
+      style: const TextStyle(color: Colors.white, fontSize: 15),
+      items:
+          _rooms
+              .map(
+                (room) => DropdownMenuItem<int>(
+                  value: room.id,
+                  child: Text(room.name),
+                ),
+              )
+              .toList(),
+      onChanged: (v) {
+        if (v != null) _onRoomSelected(v);
+      },
+      hint: const Text('방 선택', style: TextStyle(color: Colors.white70)),
+    );
+  }
+
+  Widget _buildSensorDropdown(List<Sensor> sensors) {
+    String? value = _selectedSensorSerial;
+    if (value == null || !sensors.any((s) => s.serialNumber == value)) {
+      value = sensors.isNotEmpty ? sensors.first.serialNumber : null;
+      if (value != _selectedSensorSerial) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _selectedSensorSerial = value);
+        });
+      }
+    }
+    return DropdownButton<String>(
+      value: value,
+      isExpanded: true,
+      dropdownColor: Colors.black,
+      style: const TextStyle(color: Colors.white, fontSize: 15),
+      items:
+          sensors
+              .map(
+                (sensor) => DropdownMenuItem<String>(
+                  value: sensor.serialNumber,
+                  child: Text(sensor.name),
+                ),
+              )
+              .toList(),
+      onChanged: (serial) {
+        if (serial != null) _onSensorSelected(serial);
+      },
+      hint: const Text('센서 선택', style: TextStyle(color: Colors.white70)),
+    );
+  }
+
+  Widget _buildChartCard({
+    required String title,
+    required String description,
+    required Widget child,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Card(
+        color: Colors.grey[900],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                description,
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(height: 260, child: child),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChartTab(Widget chart, String title) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        color: Colors.grey[900],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(height: 260, child: chart),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- 차트 데이터 연동 함수들 (실제 데이터 연동) ---
+
+  Widget _buildIndoorOutdoorChart() {
+    if (_stats == null) {
+      return const Center(
+        child: Text('실내 데이터 없음', style: TextStyle(color: Colors.white70)),
+      );
+    }
+    final indoor = _stats!;
+    final outdoor =
+        _externalAirQuality ??
+        {
+          'list': [
+            {
+              'components': {'pm2_5': 0, 'pm10': 0, 'co': 0, 'o3': 0},
+            },
+          ],
+        };
     final List<String> labels = ['PM2.5', 'PM10', 'CO2', 'TVOC'];
     final List<double> indoorValues = [
       (indoor['pm25Score'] ?? 0).toDouble(),
@@ -161,353 +504,378 @@ class _StatsTabState extends State<StatsTab>
       (outdoorComp['co'] ?? 0).toDouble(),
       (outdoorComp['o3'] ?? 0).toDouble(),
     ];
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        maxY:
-            [
-                  ...indoorValues,
-                  ...outdoorValues,
-                ].reduce((a, b) => a > b ? a : b) *
-                1.2 +
-            1,
-        barTouchData: BarTouchData(enabled: true),
-        titlesData: FlTitlesData(
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(showTitles: true, reservedSize: 32),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (double value, TitleMeta meta) {
-                final idx = value.toInt();
-                if (idx < 0 || idx >= labels.length) return const SizedBox();
-                return Text(
-                  labels[idx],
-                  style: const TextStyle(color: Colors.white),
-                );
-              },
-            ),
-          ),
-          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        ),
-        gridData: FlGridData(show: true),
-        borderData: FlBorderData(show: false),
-        barGroups: List.generate(labels.length, (i) {
-          return BarChartGroupData(
-            x: i,
-            barRods: [
-              BarChartRodData(
-                toY: indoorValues[i],
-                color: Colors.blueAccent,
-                width: 12,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              BarChartRodData(
-                toY: outdoorValues[i],
-                color: Colors.orangeAccent,
-                width: 12,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ],
-            showingTooltipIndicators: [0, 1],
-          );
-        }),
-        groupsSpace: 24,
-      ),
+    return IndoorOutdoorBarChart(
+      indoorScores: indoorValues,
+      outdoorScores: outdoorValues,
+      labels: labels,
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+  Widget _buildHourlyChart() {
+    if (_selectedSensorSerial == null) {
+      return const Center(
+        child: Text('센서를 선택하세요', style: TextStyle(color: Colors.white70)),
+      );
     }
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: const Text('통계', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
+    final now = DateTime.now();
+    final startTime = now.subtract(const Duration(hours: 24)).toIso8601String();
+    final endTime = now.toIso8601String();
+    return FutureBuilder<List<dynamic>?>(
+      future: fetchHourlySnapshots(_selectedSensorSerial!, startTime, endTime),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingCard();
+        }
+        if (snapshot.hasError) {
+          return _buildErrorCard();
+        }
+        final data = snapshot.data;
+        if (data == null || data.isEmpty) {
+          return _buildNoDataCard();
+        }
+        final hourlyScores =
+            data
+                .map<double>((e) => (e['overallScore'] ?? 0).toDouble())
+                .toList();
+        final hourLabels =
+            data
+                .map<String>((e) => e['snapshotHour']?.substring(11, 13) ?? '')
+                .toList();
+        return HourlyLineChart(
+          hourlyScores: hourlyScores,
+          hourLabels: hourLabels,
+        );
+      },
+    );
+  }
+
+  Widget _buildDailyChart() {
+    if (_selectedSensorSerial == null) {
+      return const Center(
+        child: Text('센서를 선택하세요', style: TextStyle(color: Colors.white70)),
+      );
+    }
+    final now = DateTime.now();
+    final startDate = now
+        .subtract(const Duration(days: 6))
+        .toIso8601String()
+        .substring(0, 10);
+    final endDate = now.toIso8601String().substring(0, 10);
+    return FutureBuilder<List<dynamic>?>(
+      future: fetchDailyReports(_selectedSensorSerial!, startDate, endDate),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingCard();
+        }
+        if (snapshot.hasError) {
+          return _buildErrorCard();
+        }
+        final data = snapshot.data;
+        if (data == null || data.isEmpty) {
+          return _buildNoDataCard();
+        }
+        final dailyScores =
+            data
+                .map<double>((e) => (e['dailyOverallScore'] ?? 0).toDouble())
+                .toList();
+        final dayLabels =
+            data
+                .map<String>((e) => e['reportDate']?.substring(5) ?? '')
+                .toList();
+        return DailyBarChart(dailyScores: dailyScores, dayLabels: dayLabels);
+      },
+    );
+  }
+
+  Widget _buildWeeklyChart() {
+    if (_selectedSensorSerial == null) {
+      return const Center(
+        child: Text('센서를 선택하세요', style: TextStyle(color: Colors.white70)),
+      );
+    }
+    final now = DateTime.now();
+    final startDate = now
+        .subtract(const Duration(days: 48))
+        .toIso8601String()
+        .substring(0, 10); // 7주 전
+    final endDate = now.toIso8601String().substring(0, 10);
+    return FutureBuilder<List<dynamic>?>(
+      future: fetchWeeklyReports(_selectedSensorSerial!, startDate, endDate),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingCard();
+        }
+        if (snapshot.hasError) {
+          return _buildErrorCard();
+        }
+        final data = snapshot.data;
+        if (data == null || data.isEmpty) {
+          return _buildNoDataCard();
+        }
+        final weeklyScores =
+            data
+                .map<double>((e) => (e['weeklyOverallScore'] ?? 0).toDouble())
+                .toList();
+        final weekLabels =
+            data.map<String>((e) => '${e['weekOfYear']}주').toList();
+        return WeeklyAreaChart(
+          weeklyScores: weeklyScores,
+          weekLabels: weekLabels,
+        );
+      },
+    );
+  }
+
+  Widget _buildOutlierChart() {
+    if (_selectedSensorSerial == null) {
+      return const Center(
+        child: Text('센서를 선택하세요', style: TextStyle(color: Colors.white70)),
+      );
+    }
+    final now = DateTime.now();
+    final startDate = now
+        .subtract(const Duration(days: 6))
+        .toIso8601String()
+        .substring(0, 10);
+    final endDate = now.toIso8601String().substring(0, 10);
+    return FutureBuilder<List<dynamic>?>(
+      future: fetchAnomalyReports(_selectedSensorSerial!, startDate, endDate),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingCard();
+        }
+        if (snapshot.hasError) {
+          return _buildErrorCard();
+        }
+        final data = snapshot.data;
+        if (data == null || data.isEmpty) {
+          return _buildNoDataCard();
+        }
+        final scores =
+            data
+                .map<double>((e) => (e['pollutantValue'] ?? 0).toDouble())
+                .toList();
+        final outlierIndices = List<int>.generate(
+          scores.length,
+          (i) => i,
+        ); // 실제 이상치 인덱스 추출 필요
+        final labels =
+            data
+                .map<String>(
+                  (e) => e['anomalyTimestamp']?.substring(5, 10) ?? '',
+                )
+                .toList();
+        return OutlierLineChart(
+          scores: scores,
+          outlierIndices: outlierIndices,
+          labels: labels,
+        );
+      },
+    );
+  }
+
+  Widget _buildPredictionChart() {
+    if (_selectedSensorSerial == null) {
+      return const Center(
+        child: Text('센서를 선택하세요', style: TextStyle(color: Colors.white70)),
+      );
+    }
+    return FutureBuilder<dynamic>(
+      future: fetchPredictedAirQuality(_selectedSensorSerial!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingCard();
+        }
+        if (snapshot.hasError) {
+          return _buildErrorCard();
+        }
+        final data = snapshot.data;
+        if (data == null) {
+          return _buildNoDataCard();
+        }
+        final actualScores =
+            (data['actual'] as List?)
+                ?.map<double>((e) => (e ?? 0).toDouble())
+                .toList() ??
+            [];
+        final predictedScores =
+            (data['predicted'] as List?)
+                ?.map<double>((e) => (e ?? 0).toDouble())
+                .toList() ??
+            [];
+        final labels =
+            (data['labels'] as List?)
+                ?.map<String>((e) => e.toString())
+                .toList() ??
+            [];
+        return PredictionLineChart(
+          actualScores: actualScores,
+          predictedScores: predictedScores,
+          labels: labels,
+        );
+      },
+    );
+  }
+
+  Widget _buildSatisfactionChart() {
+    if (_selectedRoomId == null) {
+      return const Center(
+        child: Text('방을 선택하세요', style: TextStyle(color: Colors.white70)),
+      );
+    }
+    return FutureBuilder<dynamic>(
+      future: fetchUserSatisfaction(_selectedRoomId!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingCard();
+        }
+        if (snapshot.hasError) {
+          return _buildErrorCard();
+        }
+        final data = snapshot.data;
+        if (data == null) {
+          return _buildNoDataCard();
+        }
+        final satisfied = (data['satisfied'] ?? 0).toDouble();
+        final neutral = (data['neutral'] ?? 0).toDouble();
+        final dissatisfied = (data['dissatisfied'] ?? 0).toDouble();
+        return SatisfactionPieChart(
+          satisfied: satisfied,
+          neutral: neutral,
+          dissatisfied: dissatisfied,
+        );
+      },
+    );
+  }
+
+  Widget _buildIndoorOutdoorLegend() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Row(
           children: [
-            if (_rooms.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 8,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '현재 방: \\${_findRoomById(_rooms, _selectedRoomId)?.name ?? '-'}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Builder(
-                      builder: (context) {
-                        final validRoomIds = _rooms.map((r) => r.id).toSet();
-                        final dropdownItems =
-                            validRoomIds.map((id) {
-                              final Room? room = _findRoomById(_rooms, id);
-                              return DropdownMenuItem<int>(
-                                value: id,
-                                child: Text(room?.name ?? '-'),
-                              );
-                            }).toList();
-                        int? dropdownValue = _selectedRoomId;
-                        if (dropdownItems.isEmpty) {
-                          dropdownValue = null;
-                        } else if (dropdownValue == null ||
-                            dropdownItems
-                                    .where(
-                                      (item) => item.value == dropdownValue,
-                                    )
-                                    .length !=
-                                1) {
-                          dropdownValue = dropdownItems.first.value;
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (_selectedRoomId != dropdownValue) {
-                              setState(() {
-                                _selectedRoomId = dropdownValue;
-                              });
-                            }
-                          });
-                        }
-                        return DropdownButton<int>(
-                          value: dropdownValue,
-                          isExpanded: true,
-                          dropdownColor: Colors.black,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                          ),
-                          items: dropdownItems,
-                          onChanged: (v) {
-                            if (v != null) _onRoomSelected(v);
-                          },
-                          hint: const Text(
-                            '방 선택',
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              )
-            else
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  '방을 먼저 추가하세요.',
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
-                ),
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                shape: BoxShape.circle,
               ),
-            if (_selectedRoomId != null && _sensorFuture != null)
-              FutureBuilder<List<Sensor>>(
-                future: _sensorFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        '센서 목록을 불러올 수 없습니다.',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    );
-                  } else if (snapshot.hasData) {
-                    final sensors = snapshot.data!;
-                    if (sensors.isNotEmpty && _selectedSensorSerial == null) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) {
-                          setState(() {
-                            _selectedSensorSerial = sensors[0].serialNumber;
-                          });
-                        }
-                      });
-                    }
-                    return DropdownButton<String>(
-                      value:
-                          sensors.isEmpty
-                              ? null
-                              : (sensors
-                                          .where(
-                                            (s) =>
-                                                s.serialNumber ==
-                                                _selectedSensorSerial,
-                                          )
-                                          .length ==
-                                      1
-                                  ? _selectedSensorSerial
-                                  : sensors[0].serialNumber),
-                      hint: const Text(
-                        '센서 선택',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      dropdownColor: Colors.black,
-                      items:
-                          sensors
-                              .map(
-                                (sensor) => DropdownMenuItem(
-                                  value: sensor.serialNumber,
-                                  child: Text(
-                                    sensor.name,
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                      onChanged: (serial) {
-                        if (serial != null) _onSensorSelected(serial);
-                      },
-                    );
-                  } else {
-                    return const SizedBox();
-                  }
-                },
-              ),
-            if (_stats != null)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '실내/실외 공기질 비교',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                    SizedBox(
-                      height: 260,
-                      child: _buildAirQualityBarChart(
-                        _stats!,
-                        _externalAirQuality ??
-                            {
-                              'list': [
-                                {
-                                  'components': {
-                                    'pm2_5': 0,
-                                    'pm10': 0,
-                                    'co': 0,
-                                    'o3': 0,
-                                  },
-                                },
-                              ],
-                            },
-                      ),
-                    ),
-                    if (_externalAirQuality == null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Text(
-                          '실외(외부 API) 데이터가 없어 실외 값은 0으로 표시됩니다.',
-                          style: TextStyle(
-                            color: Colors.orangeAccent,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                    Text(
-                      '실내(센서) 데이터',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      _stats.toString(),
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      '실외(외부 API) 데이터',
-                      style: TextStyle(
-                        color: Colors.lightBlueAccent,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (_externalLoading) const CircularProgressIndicator(),
-                    if (_externalError != null)
-                      Text(
-                        _externalError!,
-                        style: TextStyle(color: Colors.redAccent),
-                      ),
-                    if (_externalAirQuality != null)
-                      Text(
-                        _externalAirQuality.toString(),
-                        style: TextStyle(color: Colors.lightBlueAccent),
-                      ),
-                  ],
-                ),
-              ),
+            ),
+            const SizedBox(width: 6),
+            const Text(
+              '실내',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
           ],
         ),
+        const SizedBox(width: 16),
+        Row(
+          children: [
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: Colors.green,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Text(
+              '실외',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoadingCard() {
+    return const Center(
+      child: Text('데이터 로딩중...', style: TextStyle(color: Colors.white70)),
+    );
+  }
+
+  Widget _buildErrorCard() {
+    return const Center(
+      child: Text(
+        '데이터 로딩 중 오류가 발생했습니다.',
+        style: TextStyle(color: Colors.redAccent),
       ),
+    );
+  }
+
+  Widget _buildNoDataCard() {
+    return const Center(
+      child: Text('데이터가 없습니다.', style: TextStyle(color: Colors.white70)),
     );
   }
 }
 
-Future<List<Room>> fetchRoomList() async {
-  final res = await authorizedRequest('GET', Uri.parse(ApiConstants.roomList));
-  if (res.statusCode == 200) {
-    final List data = json.decode(res.body);
+Future<List<Room>?> fetchRoomList({void Function()? onAuthFail}) async {
+  final res = await authorizedRequest(
+    'GET',
+    Uri.parse(ApiConstants.roomList),
+    onAuthFail: onAuthFail,
+  );
+  if (res?.statusCode == 200) {
+    final List data = json.decode(res?.body ?? '[]');
     return data.map((e) => Room.fromJson(e)).toList();
   } else {
-    throw Exception('방 목록 불러오기 실패');
+    return null;
   }
 }
 
-Future<List<Sensor>> fetchSensorList(int roomId) async {
+Future<List<Sensor>?> fetchSensorList(
+  int roomId, {
+  void Function()? onAuthFail,
+}) async {
   print('[fetchSensorList] roomId: $roomId');
   final res = await authorizedRequest(
     'GET',
     Uri.parse(ApiConstants.roomSensors(roomId)),
+    onAuthFail: onAuthFail,
   );
-  print('[fetchSensorList] status: \'${res.statusCode}\', body: ${res.body}');
-  if (res.statusCode == 200) {
-    final List data = json.decode(res.body);
+  print(
+    '[fetchSensorList] status: \'${res?.statusCode}\', body: \\${res?.body}',
+  );
+  if (res?.statusCode == 200) {
+    final List data = json.decode(res?.body ?? '[]');
     return data.map((e) => Sensor.fromJson(e)).toList();
   } else {
-    throw Exception('센서 목록 불러오기 실패');
+    return null;
   }
 }
 
-Future<Map<String, dynamic>> fetchRoomScore(int roomId) async {
+Future<Map<String, dynamic>?> fetchRoomScore(
+  int roomId, {
+  void Function()? onAuthFail,
+}) async {
   final res = await authorizedRequest(
     'GET',
     Uri.parse(ApiConstants.roomScore(roomId)),
+    onAuthFail: onAuthFail,
   );
-  if (res.statusCode == 200) {
-    return json.decode(res.body);
+  if (res?.statusCode == 200) {
+    return json.decode(res?.body ?? '{}');
   } else {
-    throw Exception('방 점수 불러오기 실패');
+    return null;
   }
 }
 
-Future<Map<String, dynamic>> fetchSensorScore(String serial) async {
+Future<Map<String, dynamic>?> fetchSensorScore(
+  String serial, {
+  void Function()? onAuthFail,
+}) async {
   final res = await authorizedRequest(
     'GET',
     Uri.parse(ApiConstants.sensorScore(serial)),
+    onAuthFail: onAuthFail,
   );
-  if (res.statusCode == 200) {
-    return json.decode(res.body);
+  if (res?.statusCode == 200) {
+    return json.decode(res?.body ?? '{}');
   } else {
-    throw Exception('센서 점수 불러오기 실패');
+    return null;
   }
 }

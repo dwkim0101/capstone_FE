@@ -8,31 +8,33 @@ import '../models/sensor.dart';
 import '../models/room.dart';
 import '../utils/api_client.dart';
 
-Future<Room> fetchRoomDetail(int roomId) async {
+Future<Room?> fetchRoomDetail(int roomId) async {
   final res = await authorizedRequest(
     'GET',
     Uri.parse(ApiConstants.roomDetail(roomId)),
   );
-  if (res.statusCode == 200) {
-    final data = json.decode(res.body);
+  if (res?.statusCode == 200) {
+    final data = json.decode(res?.body ?? '{}');
     return Room.fromJson(data);
   } else {
-    throw Exception('방 상세 불러오기 실패');
+    return null;
   }
 }
 
-Future<List<Sensor>> fetchSensorList(int roomId) async {
+Future<List<Sensor>?> fetchSensorList(int roomId) async {
   print('[fetchSensorList] roomId: $roomId');
   final res = await authorizedRequest(
     'GET',
     Uri.parse('${ApiConstants.apiBase}/room/$roomId/sensors'),
   );
-  print('[fetchSensorList] status: \'${res.statusCode}\', body: ${res.body}');
-  if (res.statusCode == 200) {
-    final List data = json.decode(res.body);
+  print(
+    '[fetchSensorList] status: \'${res?.statusCode}\', body: \\${res?.body}',
+  );
+  if (res?.statusCode == 200) {
+    final List data = json.decode(res?.body ?? '[]');
     return data.map((e) => Sensor.fromJson(e)).toList();
   } else {
-    throw Exception('센서 목록 불러오기 실패');
+    return null;
   }
 }
 
@@ -44,7 +46,7 @@ class RoomDetailScreen extends StatefulWidget {
 }
 
 class _RoomDetailScreenState extends State<RoomDetailScreen> {
-  late Future<List<Sensor>> _sensorFuture;
+  late Future<List<Sensor>?> _sensorFuture;
   @override
   void initState() {
     super.initState();
@@ -82,7 +84,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         },
         child: const Icon(Icons.add),
       ),
-      body: FutureBuilder<List<Sensor>>(
+      body: FutureBuilder<List<Sensor>?>(
         future: _sensorFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {

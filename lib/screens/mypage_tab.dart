@@ -12,7 +12,7 @@ class MyPageTab extends StatefulWidget {
 }
 
 class _MyPageTabState extends State<MyPageTab> {
-  late Future<Map<String, dynamic>> _userFuture;
+  late Future<Map<String, dynamic>?> _userFuture;
 
   @override
   void initState() {
@@ -30,7 +30,7 @@ class _MyPageTabState extends State<MyPageTab> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: FutureBuilder<Map<String, dynamic>>(
+      body: FutureBuilder<Map<String, dynamic>?>(
         future: _userFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -42,7 +42,7 @@ class _MyPageTabState extends State<MyPageTab> {
                 style: TextStyle(color: Colors.white),
               ),
             );
-          } else if (snapshot.hasData) {
+          } else if (snapshot.hasData && snapshot.data != null) {
             final user = snapshot.data!;
             return Center(
               child: Column(
@@ -78,7 +78,7 @@ class _MyPageTabState extends State<MyPageTab> {
                       foregroundColor: Colors.white,
                       backgroundColor: Colors.blue,
                     ),
-                    onPressed: () {},
+                    onPressed: _showPatRegisterDialog,
                     child: const Text('설정'),
                   ),
                 ],
@@ -93,13 +93,84 @@ class _MyPageTabState extends State<MyPageTab> {
       ),
     );
   }
+
+  void _showPatRegisterDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: Colors.grey[900],
+            title: const Text(
+              'PAT 등록/수정',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'PAT 값을 입력하세요',
+                hintStyle: TextStyle(color: Colors.white54),
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white),
+                ),
+              ),
+              cursorColor: Colors.white,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  '취소',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, controller.text),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF3971FF),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text(
+                  '등록/수정',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+    );
+    if (result != null && result.trim().isNotEmpty) {
+      await _registerPat(result.trim());
+    }
+  }
+
+  Future<void> _registerPat(String pat) async {
+    final res = await authorizedRequest(
+      'POST',
+      Uri.parse('${ApiConstants.apiBase}/pat'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'pat': pat}),
+    );
+    if (res?.statusCode == 200) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('PAT 등록/수정 완료!')));
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('PAT 등록/수정 실패')));
+    }
+  }
 }
 
-Future<Map<String, dynamic>> fetchUserInfo() async {
+Future<Map<String, dynamic>?> fetchUserInfo() async {
   final res = await authorizedRequest('GET', Uri.parse(ApiConstants.userInfo));
-  if (res.statusCode == 200) {
-    return json.decode(res.body);
+  if (res?.statusCode == 200) {
+    return json.decode(res?.body ?? '{}');
   } else {
-    throw Exception('사용자 정보 불러오기 실패');
+    return null;
   }
 }

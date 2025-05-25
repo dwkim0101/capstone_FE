@@ -62,28 +62,14 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _tryAutoLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final keepLogin = prefs.getBool('keepLogin') ?? false;
-    final refreshToken = prefs.getString('refreshToken');
-    if (keepLogin && refreshToken != null && refreshToken.isNotEmpty) {
-      try {
-        final response = await authorizedRequest(
-          'POST',
-          Uri.parse(ApiConstants.reissue),
-          headers: {'Content-Type': 'application/json'},
-        );
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          await prefs.setString('accessToken', data['accessToken']);
-          await prefs.setString('refreshToken', data['refreshToken']);
-          if (!mounted) return;
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const SmartAirHome()),
-          );
-          return;
-        }
-      } catch (e) {
-        // ignore
-      }
+    final accessToken = prefs.getString('accessToken');
+    if (keepLogin && accessToken != null && accessToken.isNotEmpty) {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const SmartAirHome()),
+      );
+      return;
     }
     if (!mounted) return;
     Navigator.pushReplacement(

@@ -21,8 +21,8 @@ class Score {
 Future<Score> fetchRoomScore(int roomId) async {
   final uri = Uri.parse(ApiConstants.roomLatestScore(roomId));
   final res = await authorizedRequest('GET', uri);
-  if (res.statusCode == 200) {
-    final data = json.decode(res.body);
+  if (res?.statusCode == 200) {
+    final data = json.decode(res?.body ?? '{}');
     if (data is Map && data['overallScore'] != null) {
       final scoreValue = (data['overallScore'] as num?)?.toInt() ?? 0;
       // 점수 구간별 상태 한글 가공
@@ -53,10 +53,10 @@ Future<List<Device>> fetchDeviceList(int roomId) async {
     'GET',
     Uri.parse(ApiConstants.thinqDeviceList(roomId)),
   );
-  if (res.statusCode == 200) {
-    final List data = json.decode(res.body);
+  if (res?.statusCode == 200) {
+    final List data = json.decode(res?.body ?? '[]');
     return data.map((e) => Device.fromJson(e)).toList();
-  } else if (res.statusCode == 403) {
+  } else if (res?.statusCode == 403) {
     throw Exception('403');
   } else {
     throw Exception('기기 목록 불러오기 실패');
@@ -68,8 +68,8 @@ Future<String> fetchDevicePowerStatus(int deviceId) async {
     'GET',
     Uri.parse('${ApiConstants.baseUrl}/thinq/status/$deviceId'),
   );
-  if (res.statusCode == 200) {
-    final data = json.decode(res.body);
+  if (res?.statusCode == 200) {
+    final data = json.decode(res?.body ?? '{}');
     final op = data['response']?['operation']?['airFanOperationMode'];
     if (op == 'POWER_ON') return 'ON';
     if (op == 'POWER_OFF') return 'OFF';
@@ -98,7 +98,7 @@ Future<void> toggleDevice(int deviceId) async {
       'POST',
       Uri.parse('${ApiConstants.baseUrl}/thinq/power/$deviceId'),
     );
-    if (res.statusCode != 200) {
+    if (res?.statusCode != 200) {
       throw Exception('기기 제어 실패');
     }
   } catch (e) {
@@ -114,80 +114,80 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
-  List<dynamic> _rooms = [];
-  int? _selectedRoomId;
-  Map<String, dynamic>? _user;
-  late AnimationController _controller;
-  Future<Score>? _scoreFuture;
-  Future<List<Map<String, dynamic>>>? _deviceFutureWithStatus;
-  late Timer _scoreUpdateTimer;
+  List<dynamic> rooms0 = [];
+  int? selectedRoomId;
+  Map<String, dynamic>? user;
+  late AnimationController controller0;
+  Future<Score>? scoreFuture;
+  Future<List<Map<String, dynamic>>>? deviceFutureWithStatus;
+  late Timer scoreUpdateTimer;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    controller0 = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-    _fetchRoomsAndInit();
-    _fetchUser();
+    fetchRoomsAndInit();
+    fetchUser();
     // 점수 실시간 갱신 타이머
-    _scoreUpdateTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (_selectedRoomId != null) {
+    scoreUpdateTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (selectedRoomId != null) {
         setState(() {
-          _scoreFuture = fetchRoomScore(_selectedRoomId!);
+          scoreFuture = fetchRoomScore(selectedRoomId!);
         });
       }
     });
   }
 
-  Future<void> _fetchRoomsAndInit() async {
+  Future<void> fetchRoomsAndInit() async {
     final res = await authorizedRequest(
       'GET',
       Uri.parse(ApiConstants.roomList),
     );
-    if (res.statusCode == 200) {
-      final rooms = json.decode(res.body);
+    if (res?.statusCode == 200) {
+      final rooms = json.decode(res?.body ?? '[]');
       setState(() {
-        _rooms = rooms;
-        if (_rooms.isNotEmpty) {
+        rooms0 = rooms;
+        if (rooms0.isNotEmpty) {
           final validIds =
-              _rooms
+              rooms0
                   .where((r) => r['id'] is int)
                   .map<int>((r) => r['id'] as int)
                   .toSet();
-          if (_selectedRoomId == null || !validIds.contains(_selectedRoomId)) {
-            _selectedRoomId = _rooms[0]['id'];
+          if (selectedRoomId == null || !validIds.contains(selectedRoomId)) {
+            selectedRoomId = rooms0[0]['id'];
           }
-          _refreshRoomData();
+          refreshRoomData();
         }
       });
     }
   }
 
-  void _onRoomSelected(int? roomId) {
+  void onRoomSelected(int? roomId) {
     if (roomId == null) return;
     setState(() {
-      _selectedRoomId = roomId;
-      _refreshRoomData();
+      selectedRoomId = roomId;
+      refreshRoomData();
     });
   }
 
-  void _refreshRoomData() {
-    if (_selectedRoomId == null) return;
-    _scoreFuture = fetchRoomScore(_selectedRoomId!);
-    _deviceFutureWithStatus = fetchDeviceListWithStatus(_selectedRoomId!);
+  void refreshRoomData() {
+    if (selectedRoomId == null) return;
+    scoreFuture = fetchRoomScore(selectedRoomId!);
+    deviceFutureWithStatus = fetchDeviceListWithStatus(selectedRoomId!);
   }
 
-  Future<void> _fetchUser() async {
+  Future<void> fetchUser() async {
     try {
       final res = await authorizedRequest(
         'GET',
         Uri.parse(ApiConstants.userInfo),
       );
-      if (res.statusCode == 200) {
+      if (res?.statusCode == 200) {
         setState(() {
-          _user = json.decode(res.body);
+          user = json.decode(res?.body ?? '{}');
         });
       }
     } catch (e) {
@@ -197,15 +197,15 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
 
   @override
   void dispose() {
-    if (_controller.isAnimating) {
-      _controller.stop();
+    if (controller0.isAnimating) {
+      controller0.stop();
     }
-    _controller.dispose();
-    _scoreUpdateTimer.cancel();
+    controller0.dispose();
+    scoreUpdateTimer.cancel();
     super.dispose();
   }
 
-  Color _scoreColor(int value) {
+  Color scoreColor(int value) {
     if (value >= 90) {
       return const Color(0xFF3971FF); // 매우 좋음: 파랑
     } else if (value >= 70) {
@@ -219,7 +219,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
     }
   }
 
-  Color _statusColor(String status) {
+  Color statusColor(String status) {
     switch (status) {
       case '매우 좋음':
         return Colors.white;
@@ -236,8 +236,8 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
     }
   }
 
-  Future<void> _showAddDeviceDialog() async {
-    if (_selectedRoomId == null) {
+  Future<void> showAddDeviceDialog() async {
+    if (selectedRoomId == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('방을 먼저 추가하세요.')));
@@ -289,12 +289,12 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
         'POST',
         Uri.parse('${ApiConstants.apiBase}/device/add'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'name': result.trim(), 'roomId': _selectedRoomId}),
+        body: json.encode({'name': result.trim(), 'roomId': selectedRoomId}),
       );
-      if (res.statusCode != 200) {
+      if (res?.statusCode != 200) {
         String msg = '기기 추가 실패';
         try {
-          final data = json.decode(res.body);
+          final data = json.decode(res?.body ?? '{}');
           if (data is Map && data['message'] != null) {
             msg = data['message'].toString();
           }
@@ -304,7 +304,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
         ).showSnackBar(SnackBar(content: Text(msg)));
       } else {
         setState(() {
-          _refreshRoomData();
+          refreshRoomData();
         });
         ScaffoldMessenger.of(
           context,
@@ -313,7 +313,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
     }
   }
 
-  Future<void> _showPatRegisterDialog() async {
+  Future<void> showPatRegisterDialog() async {
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
@@ -356,22 +356,22 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
           ),
     );
     if (result != null && result.trim().isNotEmpty) {
-      await _registerPat(result.trim());
+      await registerPat(result.trim());
     }
   }
 
-  Future<void> _registerPat(String pat) async {
+  Future<void> registerPat(String pat) async {
     final res = await authorizedRequest(
       'POST',
       Uri.parse('${ApiConstants.apiBase}/pat'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({'pat': pat}),
     );
-    if (res.statusCode == 200) {
+    if (res?.statusCode == 200) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('PAT 등록 완료!')));
-      _refreshRoomData();
+      refreshRoomData();
     } else {
       ScaffoldMessenger.of(
         context,
@@ -398,13 +398,13 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
           ),
           // Container(color: Colors.black),
           // 공기 점수 뒤 애니메이션 원
-          if (_controller.isAnimating)
+          if (controller0.isAnimating)
             FutureBuilder<Score>(
-              future: _scoreFuture,
+              future: scoreFuture,
               builder: (context, snapshot) {
                 final color =
                     (snapshot.hasData)
-                        ? _scoreColor(snapshot.data!.value)
+                        ? scoreColor(snapshot.data!.value)
                         : Colors.white;
                 return Center(
                   child: Stack(
@@ -412,12 +412,12 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                     children: [
                       // Container(color: Colors.black),
                       AnimatedBuilder(
-                        animation: _controller,
+                        animation: controller0,
                         builder: (context, child) {
                           return CustomPaint(
                             size: MediaQuery.of(context).size,
                             painter: _CircleGradientPainterDark(
-                              progress: _controller.value,
+                              progress: controller0.value,
                               gradientColors: [color, color],
                             ),
                           );
@@ -443,9 +443,9 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                   style: TextStyle(fontSize: 14, color: Colors.white),
                 ),
                 const SizedBox(height: 8),
-                if (_scoreFuture != null)
+                if (scoreFuture != null)
                   FutureBuilder<Score>(
-                    future: _scoreFuture,
+                    future: scoreFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const CircularProgressIndicator();
@@ -483,7 +483,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                       offset: Offset(0, 2),
                                     ),
                                     Shadow(
-                                      color: _scoreColor(
+                                      color: scoreColor(
                                         score.value,
                                       ).withOpacity(0.4),
                                       blurRadius: 18,
@@ -498,7 +498,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                               score.status,
                               style: TextStyle(
                                 fontSize: 18,
-                                color: _statusColor(score.status),
+                                color: statusColor(score.status),
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 1.2,
                                 shadows: [
@@ -508,7 +508,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                     offset: Offset(0, 1),
                                   ),
                                   Shadow(
-                                    color: _scoreColor(
+                                    color: scoreColor(
                                       score.value,
                                     ).withOpacity(0.3),
                                     blurRadius: 12,
@@ -557,19 +557,19 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                 ),
                 const SizedBox(height: 24),
                 // 방 선택 드롭다운
-                if (_rooms.isNotEmpty)
+                if (rooms0.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Builder(
                       builder: (context) {
                         final validRoomIds =
-                            _rooms
+                            rooms0
                                 .where((r) => r['id'] is int)
                                 .map<int>((r) => r['id'] as int)
                                 .toSet();
                         final dropdownItems =
                             validRoomIds.map((id) {
-                              final room = _rooms.firstWhere(
+                              final room = rooms0.firstWhere(
                                 (r) => r['id'] == id,
                               );
                               return DropdownMenuItem<int>(
@@ -580,7 +580,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                 ),
                               );
                             }).toList();
-                        int? dropdownValue = _selectedRoomId;
+                        int? dropdownValue = selectedRoomId;
                         if (dropdownItems.isEmpty) {
                           dropdownValue = null;
                         } else if (dropdownValue == null ||
@@ -592,10 +592,10 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                 1) {
                           dropdownValue = dropdownItems.first.value;
                           WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (_selectedRoomId != dropdownValue) {
+                            if (selectedRoomId != dropdownValue) {
                               setState(() {
-                                _selectedRoomId = dropdownValue;
-                                _refreshRoomData();
+                                selectedRoomId = dropdownValue;
+                                refreshRoomData();
                               });
                             }
                           });
@@ -610,7 +610,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                           ),
                           items: dropdownItems,
                           onChanged: (v) {
-                            if (v != null) _onRoomSelected(v);
+                            if (v != null) onRoomSelected(v);
                           },
                           hint: const Text(
                             '방 선택',
@@ -634,7 +634,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                       ),
                       children: [
                         TextSpan(
-                          text: _user?['username'] ?? '유저님',
+                          text: user?['username'] ?? '유저님',
                           style: const TextStyle(color: Color(0xFF3971FF)),
                         ),
                         const TextSpan(text: ' 님. \n현재 대기점수를 확인하세요.'),
@@ -644,9 +644,9 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                 ),
                 Spacer(),
                 // 기기 카드
-                if (_deviceFutureWithStatus != null)
+                if (deviceFutureWithStatus != null)
                   FutureBuilder<List<Map<String, dynamic>>>(
-                    future: _deviceFutureWithStatus,
+                    future: deviceFutureWithStatus,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
@@ -675,7 +675,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                 ),
                                 const SizedBox(height: 16),
                                 ElevatedButton(
-                                  onPressed: _showPatRegisterDialog,
+                                  onPressed: showPatRegisterDialog,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Color(0xFF3971FF),
                                     foregroundColor: Colors.white,
@@ -749,7 +749,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                           ),
                                         ),
                                         const SizedBox(height: 8),
-                                        if (_rooms.isEmpty)
+                                        if (rooms0.isEmpty)
                                           const Padding(
                                             padding: EdgeInsets.only(top: 8.0),
                                             child: Text(
@@ -860,7 +860,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                                     ),
                                                   );
                                                   if (result == true)
-                                                    _refreshRoomData();
+                                                    refreshRoomData();
                                                 },
                                                 trailing: Switch(
                                                   value: isOn,
@@ -868,7 +868,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                                     await toggleDevice(
                                                       device.id,
                                                     );
-                                                    _refreshRoomData();
+                                                    refreshRoomData();
                                                   },
                                                   activeColor: Color(
                                                     0xFF3971FF,
@@ -915,7 +915,7 @@ class _CircleGradientPainterDark extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Offset center = Offset(size.width / 2, size.height / 2);
-    _drawLayer(canvas, center, size.width * 0.3 + (15 * progress), [
+    drawLayer(canvas, center, size.width * 0.3 + (15 * progress), [
       Color.lerp(
         gradientColors[0],
         gradientColors[1],
@@ -928,7 +928,7 @@ class _CircleGradientPainterDark extends CustomPainter {
       )!.withOpacity(0.4),
       Colors.transparent,
     ]);
-    _drawLayer(canvas, center, size.width * 0.4 + (20 * progress), [
+    drawLayer(canvas, center, size.width * 0.4 + (20 * progress), [
       Color.lerp(
         gradientColors[1],
         gradientColors[0],
@@ -941,7 +941,7 @@ class _CircleGradientPainterDark extends CustomPainter {
       )!.withOpacity(0.3),
       Colors.transparent,
     ]);
-    _drawLayer(canvas, center, size.width * 0.5 + (25 * progress), [
+    drawLayer(canvas, center, size.width * 0.5 + (25 * progress), [
       Color.lerp(
         gradientColors[1],
         gradientColors[0],
@@ -951,7 +951,7 @@ class _CircleGradientPainterDark extends CustomPainter {
     ]);
   }
 
-  void _drawLayer(
+  void drawLayer(
     Canvas canvas,
     Offset center,
     double radius,
@@ -972,7 +972,7 @@ class _CircleGradientPainterDark extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CircleGradientPainterDark oldDelegate) {
+  bool shouldRepaint(_CircleGradientPainterDark oldDelegate) {
     return oldDelegate.progress != progress;
   }
 }

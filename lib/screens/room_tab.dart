@@ -5,16 +5,17 @@ import 'room_detail_screen.dart';
 import 'room_add_screen.dart';
 import '../models/room.dart';
 import '../utils/api_client.dart';
+import 'login_screen.dart';
 
-Future<List<Room>> fetchRoomList() async {
-  print('[fetchRoomList] GET: ${ApiConstants.roomList}');
+Future<List<Room>?> fetchRoomList() async {
+  print('[fetchRoomList] GET: \\${ApiConstants.roomList}');
   final res = await authorizedRequest('GET', Uri.parse(ApiConstants.roomList));
-  print('[fetchRoomList] status: \'${res.statusCode}\', body: ${res.body}');
-  if (res.statusCode == 200) {
-    final List data = json.decode(res.body);
+  print('[fetchRoomList] status: \'${res?.statusCode}\', body: \\${res?.body}');
+  if (res?.statusCode == 200) {
+    final List data = json.decode(res?.body ?? '[]');
     return data.map((e) => Room.fromJson(e)).toList();
   } else {
-    throw Exception('방 목록 불러오기 실패');
+    return null;
   }
 }
 
@@ -35,14 +36,21 @@ class _RoomTabState extends State<RoomTab> {
 
   Future<void> _fetchRooms() async {
     setState(() => _loading = true);
-    final res = await authorizedRequest(
-      'GET',
-      Uri.parse(ApiConstants.roomList),
-    );
-    if (res.statusCode == 200) {
-      setState(() => _loading = false);
-    } else {
-      setState(() => _loading = false);
+    try {
+      final res = await authorizedRequest(
+        'GET',
+        Uri.parse(ApiConstants.roomList),
+      );
+      if (res?.statusCode == 200) {
+        setState(() => _loading = false);
+      } else {
+        setState(() => _loading = false);
+      }
+    } catch (e) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     }
   }
 
@@ -70,7 +78,7 @@ class _RoomTabState extends State<RoomTab> {
         },
         child: const Icon(Icons.add),
       ),
-      body: FutureBuilder<List<Room>>(
+      body: FutureBuilder<List<Room>?>(
         future: fetchRoomList(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -98,7 +106,7 @@ class _RoomTabState extends State<RoomTab> {
                 ],
               ),
             );
-          } else if (snapshot.hasData) {
+          } else if (snapshot.hasData && snapshot.data != null) {
             final rooms = snapshot.data!;
             if (rooms.isEmpty) {
               return const Center(

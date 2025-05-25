@@ -16,12 +16,12 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = const [
-    HomeTab(),
-    DeviceTab(),
-    RoomTab(),
-    StatsTab(),
-    MyPageTab(),
+  final List<Widget> _pages = [
+    const HomeTab(),
+    const DeviceTab(),
+    const RoomTab(),
+    const StatsTab(),
+    const MyPageTab(),
   ];
 
   void _onTabSelected(int index) {

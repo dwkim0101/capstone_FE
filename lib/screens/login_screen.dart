@@ -44,8 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
       print(
         'body: \\${jsonEncode({'email': _emailController.text, 'password': _passwordController.text})}',
       );
-      final response = await authorizedRequest(
-        'POST',
+      final response = await http.post(
         Uri.parse(ApiConstants.login),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -59,12 +58,31 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.statusCode == 200) {
         try {
           final prefs = await SharedPreferences.getInstance();
-          final accessToken = response.headers['accessToken'];
-          final refreshToken = response.headers['refreshToken'];
-          if (accessToken != null)
+          final accessToken = response.headers['access'];
+          String? refreshToken;
+          final setCookie = response.headers['set-cookie'];
+          if (setCookie != null) {
+            final match = RegExp(r'refresh=([^;]+);').firstMatch(setCookie);
+            if (match != null) {
+              refreshToken = match.group(1);
+            }
+          }
+          print('[DEBUG] 응답 accessToken: $accessToken');
+          print('[DEBUG] 응답 refreshToken: $refreshToken');
+          if (accessToken != null) {
             await prefs.setString('accessToken', accessToken);
-          if (refreshToken != null)
+            print(
+              '[DEBUG] 저장된 accessToken: \\${prefs.getString('accessToken')}',
+            );
+          }
+          if (refreshToken != null) {
             await prefs.setString('refreshToken', refreshToken);
+            print(
+              '[DEBUG] 저장된 refreshToken: \\${prefs.getString('refreshToken')}',
+            );
+          }
+          if (accessToken == null) print('[DEBUG] accessToken이 null입니다!');
+          if (refreshToken == null) print('[DEBUG] refreshToken이 null입니다!');
           await prefs.setBool('keepLogin', _keepLogin);
           if (!mounted) return;
           Navigator.pushReplacement(

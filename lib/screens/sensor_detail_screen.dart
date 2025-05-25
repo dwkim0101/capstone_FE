@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/sensor.dart';
 import '../utils/api_client.dart';
+import 'login_screen.dart';
 
 class SensorDetailScreen extends StatefulWidget {
   final Sensor sensor;
@@ -31,18 +32,27 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
       '[_fetchData] GET: ${ApiConstants.sensorLatestSnapshot(widget.sensor.serialNumber)}',
     );
     setState(() => _loading = true);
-    final res = await authorizedRequest(
-      'GET',
-      Uri.parse(ApiConstants.sensorLatestSnapshot(widget.sensor.serialNumber)),
-    );
-    print('[_fetchData] status: \'${res.statusCode}\', body: ${res.body}');
-    if (res.statusCode == 200) {
-      setState(() {
-        _data = json.decode(res.body);
-        _loading = false;
-      });
-    } else {
-      setState(() => _loading = false);
+    try {
+      final res = await authorizedRequest(
+        'GET',
+        Uri.parse(
+          ApiConstants.sensorLatestSnapshot(widget.sensor.serialNumber),
+        ),
+      );
+      print('[_fetchData] status: \'${res?.statusCode}\', body: ${res?.body}');
+      if (res?.statusCode == 200) {
+        setState(() {
+          _data = json.decode(res?.body ?? '{}');
+          _loading = false;
+        });
+      } else {
+        setState(() => _loading = false);
+      }
+    } catch (e) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     }
   }
 
@@ -57,21 +67,30 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
       '[_fetchHistory] GET: '
       '${ApiConstants.sensorHourlySnapshot(widget.sensor.serialNumber, startStr, endStr)}',
     );
-    final res = await authorizedRequest(
-      'GET',
-      Uri.parse(
-        ApiConstants.sensorHourlySnapshot(
-          widget.sensor.serialNumber,
-          startStr,
-          endStr,
+    try {
+      final res = await authorizedRequest(
+        'GET',
+        Uri.parse(
+          ApiConstants.sensorHourlySnapshot(
+            widget.sensor.serialNumber,
+            startStr,
+            endStr,
+          ),
         ),
-      ),
-    );
-    print('[_fetchHistory] status: \'${res.statusCode}\', body: ${res.body}');
-    if (res.statusCode == 200) {
-      setState(() {
-        _history = json.decode(res.body);
-      });
+      );
+      print(
+        '[_fetchHistory] status: \'${res?.statusCode}\', body: ${res?.body}',
+      );
+      if (res?.statusCode == 200) {
+        setState(() {
+          _history = json.decode(res?.body ?? '[]');
+        });
+      }
+    } catch (e) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     }
   }
 
@@ -79,25 +98,32 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
     print(
       '[fetchStatus] GET: /sensor/status?deviceSerialNumber=${widget.sensor.serialNumber}',
     );
-    final res = await authorizedRequest(
-      'GET',
-      Uri.parse(
-        '${ApiConstants.baseUrl}/sensor/status?deviceSerialNumber=${widget.sensor.serialNumber}',
-      ),
-    );
-    print('[fetchStatus] status: \'${res.statusCode}\', body: ${res.body}');
-    if (res.statusCode == 200) {
-      try {
-        final decoded = json.decode(res.body);
-        setState(() {
-          _status = decoded is Map<String, dynamic> ? decoded : null;
-        });
-      } catch (e) {
-        print('센서 상태 JSON 파싱 에러: $e');
-        setState(() {
-          _status = null;
-        });
+    try {
+      final res = await authorizedRequest(
+        'GET',
+        Uri.parse(
+          '${ApiConstants.baseUrl}/sensor/status?deviceSerialNumber=${widget.sensor.serialNumber}',
+        ),
+      );
+      print('[fetchStatus] status: \'${res?.statusCode}\', body: ${res?.body}');
+      if (res?.statusCode == 200) {
+        try {
+          final decoded = json.decode(res?.body ?? '{}');
+          setState(() {
+            _status = decoded is Map<String, dynamic> ? decoded : null;
+          });
+        } catch (e) {
+          print('센서 상태 JSON 파싱 에러: $e');
+          setState(() {
+            _status = null;
+          });
+        }
       }
+    } catch (e) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     }
   }
 
@@ -107,14 +133,22 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
       'serialNumber': widget.sensor.serialNumber,
       // roomId는 필요시 별도 전달(예: widget.sensor.roomId)
     };
-    final res = await authorizedRequest(
-      'DELETE',
-      Uri.parse(ApiConstants.sensorDelete),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode(body),
-    );
-    setState(() => _loading = false);
-    Navigator.pop(context, true);
+    try {
+      await authorizedRequest(
+        'DELETE',
+        Uri.parse(ApiConstants.sensorDelete),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(body),
+      );
+      setState(() => _loading = false);
+      Navigator.pop(context, true);
+    } catch (e) {
+      setState(() => _loading = false);
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override

@@ -39,7 +39,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       headers: {'Content-Type': 'application/json'},
       // body: json.encode({'id': widget.device.id, 'on': !isActive}), // 실제 명세상 body 필요없으면 제거
     );
-    print('[_toggleDevice] status: \'${res.statusCode}\', body: ${res.body}');
+    print(
+      '[_toggleDevice] status: \\${res?.statusCode}\', body: \\${res?.body}',
+    );
     setState(() {
       isActive = !isActive;
       _loading = false;

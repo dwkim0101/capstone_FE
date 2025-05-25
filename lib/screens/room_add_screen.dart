@@ -32,7 +32,7 @@ class _RoomAddScreenState extends State<RoomAddScreen> {
       headers: {'Content-Type': 'application/json'},
       body: json.encode(body),
     );
-    print('[_addRoom] status: \'${res.statusCode}\', body: ${res.body}');
+    print('[_addRoom] status: \'${res?.statusCode}\', body: \\${res?.body}');
     setState(() => _loading = false);
     Navigator.pop(context, true);
   }

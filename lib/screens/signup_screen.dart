@@ -42,9 +42,9 @@ class _SignupScreenState extends State<SignupScreen> {
           'role': 'USER',
         }),
       );
-      print('응답 status: \\${response.statusCode}');
-      print('응답 body: ${response.body}');
-      if (response.statusCode == 200) {
+      print('응답 status: \\${response?.statusCode}');
+      print('응답 body: \\${response?.body}');
+      if (response?.statusCode == 200) {
         setState(() {
           _success = '회원가입이 완료되었습니다!';
         });
@@ -56,7 +56,7 @@ class _SignupScreenState extends State<SignupScreen> {
         });
       } else {
         setState(() {
-          _error = '회원가입 실패: \\${response.statusCode}';
+          _error = '회원가입 실패: \\${response?.statusCode}';
         });
       }
     } catch (e) {

@@ -7,28 +7,29 @@ import '../utils/api_client.dart';
 import 'device_detail_screen.dart' hide Device;
 import '../models/device.dart';
 import 'dart:ui';
+import 'login_screen.dart';
 
-Future<List<Room>> fetchRoomList() async {
+Future<List<Room>?> fetchRoomList() async {
   final res = await authorizedRequest('GET', Uri.parse(ApiConstants.roomList));
-  if (res.statusCode == 200) {
-    final List data = json.decode(res.body);
+  if (res?.statusCode == 200) {
+    final List data = json.decode(res?.body ?? '[]');
     return data.map((e) => Room.fromJson(e)).toList();
   } else {
-    throw Exception('방 목록 불러오기 실패');
+    return null;
   }
 }
 
-Future<List<Device>> fetchDeviceList(int roomId) async {
+Future<List<Device>?> fetchDeviceList(int roomId) async {
   print("[fetchDeviceList] GET: ${ApiConstants.thinqDeviceList(roomId)}");
   final res = await authorizedRequest(
     'GET',
     Uri.parse(ApiConstants.thinqDeviceList(roomId)),
   );
-  print("[fetchDeviceList] status: ${res.statusCode}, body: ${res.body}");
-  if (res.statusCode == 200) {
-    final List data = json.decode(res.body);
+  print("[fetchDeviceList] status: ${res?.statusCode}, body: ${res?.body}");
+  if (res?.statusCode == 200) {
+    final List data = json.decode(res?.body ?? '[]');
     return data.map((e) => Device.fromJson(e)).toList();
-  } else if (res.statusCode == 403) {
+  } else if (res?.statusCode == 403) {
     throw Exception('403');
   } else {
     throw Exception('기기 목록 불러오기 실패');
@@ -36,13 +37,13 @@ Future<List<Device>> fetchDeviceList(int roomId) async {
 }
 
 Future<void> toggleDevice(int deviceId) async {
-  print('[toggleDevice] POST: /thinq/power/[36m$deviceId[0m');
+  print('[toggleDevice] POST: /thinq/power/\u001b[36m$deviceId\u001b[0m');
   final res = await authorizedRequest(
     'POST',
     Uri.parse('${ApiConstants.baseUrl}/thinq/power/$deviceId'),
   );
-  print('[toggleDevice] status: \'${res.statusCode}\', body: ${res.body}');
-  if (res.statusCode != 200) {
+  print('[toggleDevice] status: \'${res?.statusCode}\', body: \\${res?.body}');
+  if (res?.statusCode != 200) {
     throw Exception('기기 제어 실패');
   }
 }
@@ -52,8 +53,8 @@ Future<String> fetchDevicePowerStatus(int deviceId) async {
     'GET',
     Uri.parse('${ApiConstants.baseUrl}/thinq/status/$deviceId'),
   );
-  if (res.statusCode == 200) {
-    final data = json.decode(res.body);
+  if (res?.statusCode == 200) {
+    final data = json.decode(res?.body ?? '{}');
     final op = data['response']?['operation']?['airFanOperationMode'];
     if (op == 'POWER_ON') return 'ON';
     if (op == 'POWER_OFF') return 'OFF';
@@ -64,7 +65,7 @@ Future<String> fetchDevicePowerStatus(int deviceId) async {
 }
 
 Future<List<Map<String, dynamic>>> fetchDeviceListWithStatus(int roomId) async {
-  final devices = await fetchDeviceList(roomId);
+  final devices = await fetchDeviceList(roomId) ?? [];
   final List<Map<String, dynamic>> result = [];
   for (final device in devices) {
     if (device.isRegistered == true) {
@@ -106,33 +107,48 @@ class _DeviceTabState extends State<DeviceTab>
 
   Future<void> _fetchRooms() async {
     setState(() => _loading = true);
-    final res = await authorizedRequest(
-      'GET',
-      Uri.parse(ApiConstants.roomList),
-    );
-    if (res.statusCode == 200) {
-      final List data = json.decode(res.body);
-      setState(() {
-        _rooms = data.map((e) => Room.fromJson(e)).toList();
-        if (_rooms.isNotEmpty) {
-          final validIds = _rooms.map((r) => r.id).toSet();
-          if (_selectedRoomId == null || !validIds.contains(_selectedRoomId)) {
-            _selectedRoomId = _rooms[0].id;
+    try {
+      final res = await authorizedRequest(
+        'GET',
+        Uri.parse(ApiConstants.roomList),
+      );
+      if (res?.statusCode == 200) {
+        final List data = json.decode(res?.body ?? '[]');
+        setState(() {
+          _rooms = data.map((e) => Room.fromJson(e)).toList();
+          if (_rooms.isNotEmpty) {
+            final validIds = _rooms.map((r) => r.id).toSet();
+            if (_selectedRoomId == null ||
+                !validIds.contains(_selectedRoomId)) {
+              _selectedRoomId = _rooms[0].id;
+            }
+            _fetchDevices();
           }
-          _fetchDevices();
-        }
-        _loading = false;
-      });
-    } else {
-      setState(() => _loading = false);
+          _loading = false;
+        });
+      } else {
+        setState(() => _loading = false);
+      }
+    } catch (e) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     }
   }
 
   Future<void> _fetchDevices() async {
     if (_selectedRoomId == null) return;
-    setState(() {
-      _deviceFutureWithStatus = fetchDeviceListWithStatus(_selectedRoomId!);
-    });
+    try {
+      setState(() {
+        _deviceFutureWithStatus = fetchDeviceListWithStatus(_selectedRoomId!);
+      });
+    } catch (e) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   void _onRoomSelected(int? roomId) {
@@ -198,7 +214,7 @@ class _DeviceTabState extends State<DeviceTab>
       headers: {'Content-Type': 'application/json'},
       body: json.encode({'name': name, 'roomId': roomId}),
     );
-    if (res.statusCode != 200) {
+    if (res?.statusCode != 200) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('기기 추가 실패')));
@@ -259,7 +275,7 @@ class _DeviceTabState extends State<DeviceTab>
       headers: {'Content-Type': 'application/json'},
       body: json.encode({'pat': pat}),
     );
-    if (res.statusCode == 200) {
+    if (res?.statusCode == 200) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('PAT 등록 완료!')));
@@ -276,14 +292,14 @@ class _DeviceTabState extends State<DeviceTab>
       'POST',
       Uri.parse('${ApiConstants.apiBase}/room/$roomId/pat-permission-request'),
     );
-    if (res.statusCode == 200) {
+    if (res?.statusCode == 200) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('방장에게 PAT 권한 요청을 보냈습니다.')));
     } else {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('권한 요청 실패: ${res.body}')));
+      ).showSnackBar(SnackBar(content: Text('권한 요청 실패: ${res?.body}')));
     }
   }
 
