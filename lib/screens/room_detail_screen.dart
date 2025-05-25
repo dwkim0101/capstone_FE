@@ -60,7 +60,15 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.room.name} - 센서 목록')),
+      appBar: AppBar(
+        title: Text(
+          '${widget.room.name} - 센서 목록',
+          style: const TextStyle(color: Colors.white),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final result = await Navigator.push(
@@ -81,37 +89,40 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(
-              child: Card(
-                margin: const EdgeInsets.all(24),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error, color: Colors.red, size: 48),
-                      const SizedBox(height: 16),
-                      Text(
-                        '센서 목록을 불러올 수 없습니다.',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF3971FF),
-                          foregroundColor: Colors.white,
-                          textStyle: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          minimumSize: const Size.fromHeight(48),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error, color: Colors.red, size: 48),
+                        const SizedBox(height: 16),
+                        Text(
+                          '센서 목록을 불러올 수 없습니다.',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                          textAlign: TextAlign.center,
                         ),
-                        onPressed: _refresh,
-                        child: const Text('다시 시도'),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3971FF),
+                            foregroundColor: Colors.white,
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            minimumSize: const Size.fromHeight(48),
+                          ),
+                          onPressed: _refresh,
+                          child: const Text('다시 시도'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -121,7 +132,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
             if (sensors.isEmpty) {
               return const Center(child: Text('등록된 센서가 없습니다.'));
             }
-            return Padding(
+            return SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Card(
                 child: Padding(
@@ -135,34 +146,40 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                           context,
                         ).textTheme.titleLarge?.copyWith(color: Colors.white),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
                       Text(
                         '센서 목록',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.titleMedium?.copyWith(color: Colors.white),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: Colors.white70),
                       ),
-                      const SizedBox(height: 8),
+                      const Divider(
+                        color: Colors.white24,
+                        thickness: 1,
+                        height: 24,
+                      ),
                       ...sensors.map(
-                        (sensor) => ListTile(
-                          leading: const Icon(
-                            Icons.sensors,
-                            color: Colors.white,
+                        (sensor) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.sensors,
+                              color: Colors.white,
+                            ),
+                            title: Text(
+                              sensor.name,
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(color: Colors.white),
+                            ),
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => SensorDetailScreen(sensor: sensor),
+                                ),
+                              );
+                            },
                           ),
-                          title: Text(
-                            sensor.name,
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(color: Colors.white),
-                          ),
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => SensorDetailScreen(sensor: sensor),
-                              ),
-                            );
-                          },
                         ),
                       ),
                     ],

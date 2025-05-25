@@ -19,15 +19,17 @@ Future<List<Room>> fetchRoomList() async {
 }
 
 Future<List<Device>> fetchDeviceList(int roomId) async {
-  print('[fetchDeviceList] GET: ${ApiConstants.deviceList(roomId)}');
+  print("[fetchDeviceList] GET: ${ApiConstants.thinqDeviceList(roomId)}");
   final res = await authorizedRequest(
     'GET',
-    Uri.parse(ApiConstants.deviceList(roomId)),
+    Uri.parse(ApiConstants.thinqDeviceList(roomId)),
   );
-  print('[fetchDeviceList] status: \'${res.statusCode}\', body: ${res.body}');
+  print("[fetchDeviceList] status: ${res.statusCode}, body: ${res.body}");
   if (res.statusCode == 200) {
     final List data = json.decode(res.body);
     return data.map((e) => Device.fromJson(e)).toList();
+  } else if (res.statusCode == 403) {
+    throw Exception('403');
   } else {
     throw Exception('기기 목록 불러오기 실패');
   }
@@ -65,10 +67,21 @@ Future<List<Map<String, dynamic>>> fetchDeviceListWithStatus(int roomId) async {
   final devices = await fetchDeviceList(roomId);
   final List<Map<String, dynamic>> result = [];
   for (final device in devices) {
-    final status = await fetchDevicePowerStatus(device.id);
-    result.add({'device': device, 'status': status});
+    if (device.isRegistered == true) {
+      final status = await fetchDevicePowerStatus(device.id);
+      result.add({'device': device, 'status': status});
+    }
+    // isRegistered==false인 기기는 status 요청/추가하지 않음
   }
   return result;
+}
+
+Room? _findRoomById(List<Room> rooms, int? id) {
+  if (id == null) return null;
+  for (final r in rooms) {
+    if (r.id == id) return r;
+  }
+  return null;
 }
 
 class DeviceTab extends StatefulWidget {
@@ -79,7 +92,7 @@ class DeviceTab extends StatefulWidget {
 
 class _DeviceTabState extends State<DeviceTab>
     with AutomaticKeepAliveClientMixin {
-  List<dynamic> _rooms = [];
+  List<Room> _rooms = [];
   int? _selectedRoomId;
   bool _loading = true;
   final List<Device> _devices = [];
@@ -98,17 +111,13 @@ class _DeviceTabState extends State<DeviceTab>
       Uri.parse(ApiConstants.roomList),
     );
     if (res.statusCode == 200) {
-      final rooms = json.decode(res.body);
+      final List data = json.decode(res.body);
       setState(() {
-        _rooms = rooms;
+        _rooms = data.map((e) => Room.fromJson(e)).toList();
         if (_rooms.isNotEmpty) {
-          final validIds =
-              _rooms
-                  .where((r) => r['id'] is int)
-                  .map<int>((r) => r['id'] as int)
-                  .toSet();
+          final validIds = _rooms.map((r) => r.id).toSet();
           if (_selectedRoomId == null || !validIds.contains(_selectedRoomId)) {
-            _selectedRoomId = _rooms[0]['id'];
+            _selectedRoomId = _rooms[0].id;
           }
           _fetchDevices();
         }
@@ -140,19 +149,38 @@ class _DeviceTabState extends State<DeviceTab>
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('기기 추가'),
+            backgroundColor: Colors.grey[900],
+            title: const Text('기기 추가', style: TextStyle(color: Colors.white)),
             content: TextField(
               controller: controller,
-              decoration: const InputDecoration(hintText: '기기명 입력'),
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: '기기명 입력',
+                hintStyle: TextStyle(color: Colors.white54),
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white),
+                ),
+              ),
+              cursorColor: Colors.white,
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('취소'),
+                child: const Text(
+                  '취소',
+                  style: TextStyle(color: Colors.white70),
+                ),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, controller.text),
-                child: const Text('추가'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF3971FF),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('추가', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -174,6 +202,88 @@ class _DeviceTabState extends State<DeviceTab>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('기기 추가 실패')));
+    }
+  }
+
+  Future<void> _showPatRegisterDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: Colors.grey[900],
+            title: const Text('PAT 등록', style: TextStyle(color: Colors.white)),
+            content: TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'PAT 값을 입력하세요',
+                hintStyle: TextStyle(color: Colors.white54),
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white),
+                ),
+              ),
+              cursorColor: Colors.white,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  '취소',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, controller.text),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF3971FF),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('등록', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+    );
+    if (result != null && result.trim().isNotEmpty) {
+      await _registerPat(result.trim());
+    }
+  }
+
+  Future<void> _registerPat(String pat) async {
+    final res = await authorizedRequest(
+      'POST',
+      Uri.parse('${ApiConstants.apiBase}/pat'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'pat': pat}),
+    );
+    if (res.statusCode == 200) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('PAT 등록 완료!')));
+      _fetchDevices();
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('PAT 등록 실패')));
+    }
+  }
+
+  Future<void> _requestPatPermission(int roomId) async {
+    final res = await authorizedRequest(
+      'POST',
+      Uri.parse('${ApiConstants.apiBase}/room/$roomId/pat-permission-request'),
+    );
+    if (res.statusCode == 200) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('방장에게 PAT 권한 요청을 보냈습니다.')));
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('권한 요청 실패: ${res.body}')));
     }
   }
 
@@ -208,7 +318,7 @@ class _DeviceTabState extends State<DeviceTab>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '현재 방: ${_rooms.firstWhere((r) => r['id'] == _selectedRoomId, orElse: () => null)?['name'] ?? '-'}',
+                    '현재 방: ${_findRoomById(_rooms, _selectedRoomId)?.name ?? '-'}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -218,19 +328,13 @@ class _DeviceTabState extends State<DeviceTab>
                   const SizedBox(height: 4),
                   Builder(
                     builder: (context) {
-                      final validRoomIds =
-                          _rooms
-                              .where((r) => r['id'] is int)
-                              .map<int>((r) => r['id'] as int)
-                              .toSet();
+                      final validRoomIds = _rooms.map((r) => r.id).toSet();
                       final dropdownItems =
                           validRoomIds.map((id) {
-                            final room = _rooms.firstWhere(
-                              (r) => r['id'] == id,
-                            );
+                            final Room? room = _findRoomById(_rooms, id);
                             return DropdownMenuItem<int>(
                               value: id,
-                              child: Text(room['name']),
+                              child: Text(room?.name ?? '-'),
                             );
                           }).toList();
                       int? dropdownValue;
@@ -290,14 +394,98 @@ class _DeviceTabState extends State<DeviceTab>
                               child: CircularProgressIndicator(),
                             );
                           } else if (snapshot.hasError) {
+                            final error = snapshot.error.toString();
+                            if (error.contains('403')) {
+                              final room = _findRoomById(
+                                _rooms,
+                                _selectedRoomId,
+                              );
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.lock_outline,
+                                      color: Colors.redAccent,
+                                      size: 48,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      '이 방의 기기 목록을 볼 권한이 없습니다.\n(PAT 등록 필요)',
+                                      style: const TextStyle(
+                                        color: Colors.redAccent,
+                                        fontSize: 16,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: _showPatRegisterDialog,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Color(0xFF3971FF),
+                                        foregroundColor: Colors.white,
+                                        textStyle: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'PAT 등록하기',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ),
+                                    if (room != null) ...[
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        '방 이름: ${room.name}',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ElevatedButton.icon(
+                                        onPressed:
+                                            () =>
+                                                _requestPatPermission(room.id),
+                                        icon: const Icon(
+                                          Icons.send,
+                                          color: Colors.white,
+                                        ),
+                                        label: const Text(
+                                          '방장에게 PAT 권한 요청',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.deepPurple,
+                                          foregroundColor: Colors.white,
+                                          textStyle: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            }
+                            // 기타 에러
                             return Center(
                               child: Text(
-                                '기기 오류: \\${snapshot.error}',
+                                '기기 오류: $error',
                                 style: TextStyle(color: Colors.white),
                               ),
                             );
                           } else if (snapshot.hasData) {
                             final devices = snapshot.data!;
+                            final filteredDevices =
+                                devices
+                                    .where(
+                                      (d) =>
+                                          (d['device'] as Device)
+                                              .isRegistered ==
+                                          true,
+                                    )
+                                    .toList();
                             return Padding(
                               padding: const EdgeInsets.all(16),
                               child: ClipRRect(
@@ -320,7 +508,7 @@ class _DeviceTabState extends State<DeviceTab>
                                       horizontal: 12,
                                     ),
                                     child:
-                                        devices.isEmpty
+                                        filteredDevices.isEmpty
                                             ? SizedBox(
                                               width: double.infinity,
                                               child: Column(
@@ -359,23 +547,28 @@ class _DeviceTabState extends State<DeviceTab>
                                             )
                                             : ListView.separated(
                                               shrinkWrap: true,
-                                              itemCount: devices.length,
+                                              itemCount: filteredDevices.length,
                                               separatorBuilder:
                                                   (_, __) => const SizedBox(
                                                     height: 16,
                                                   ),
                                               itemBuilder: (context, i) {
                                                 final device =
-                                                    devices[i]['device']
+                                                    filteredDevices[i]['device']
                                                         as Device;
                                                 final status =
-                                                    devices[i]['status']
+                                                    filteredDevices[i]['status']
                                                         as String;
                                                 final isOn = status == 'ON';
                                                 return Container(
                                                   decoration: BoxDecoration(
-                                                    color: Colors.white
-                                                        .withOpacity(0.10),
+                                                    color:
+                                                        isOn
+                                                            ? Color(0xFF3971FF)
+                                                            : Colors.white
+                                                                .withOpacity(
+                                                                  0.10,
+                                                                ),
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                           16,
@@ -396,21 +589,6 @@ class _DeviceTabState extends State<DeviceTab>
                                                                       0.18,
                                                                     ),
                                                         shape: BoxShape.circle,
-                                                        boxShadow: [
-                                                          if (isOn)
-                                                            BoxShadow(
-                                                              color: Color(
-                                                                0xFF3971FF,
-                                                              ).withOpacity(
-                                                                0.3,
-                                                              ),
-                                                              blurRadius: 12,
-                                                              offset: Offset(
-                                                                0,
-                                                                4,
-                                                              ),
-                                                            ),
-                                                        ],
                                                       ),
                                                       child: Icon(
                                                         Icons.air,
@@ -431,24 +609,7 @@ class _DeviceTabState extends State<DeviceTab>
                                                             FontWeight.w600,
                                                       ),
                                                     ),
-                                                    subtitle: Text(
-                                                      isOn ? '켜짐' : '꺼짐',
-                                                      style: TextStyle(
-                                                        color:
-                                                            isOn
-                                                                ? Color(
-                                                                  0xFF3971FF,
-                                                                )
-                                                                : Colors
-                                                                    .white70,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                    trailing: const Icon(
-                                                      Icons.chevron_right,
-                                                      color: Colors.white,
-                                                    ),
+                                                    enabled: true,
                                                     onTap: () async {
                                                       final result = await Navigator.push(
                                                         context,
@@ -464,6 +625,9 @@ class _DeviceTabState extends State<DeviceTab>
                                                                           .name,
                                                                   isActive:
                                                                       isOn,
+                                                                  isRegistered:
+                                                                      device
+                                                                          .isRegistered,
                                                                 ),
                                                               ),
                                                         ),
@@ -471,6 +635,22 @@ class _DeviceTabState extends State<DeviceTab>
                                                       if (result == true)
                                                         _fetchDevices();
                                                     },
+                                                    trailing: Switch(
+                                                      value: isOn,
+                                                      onChanged: (_) async {
+                                                        await toggleDevice(
+                                                          device.id,
+                                                        );
+                                                        _fetchDevices();
+                                                      },
+                                                      activeColor: Color(
+                                                        0xFF3971FF,
+                                                      ),
+                                                      inactiveThumbColor:
+                                                          Colors.white54,
+                                                      inactiveTrackColor:
+                                                          Colors.white24,
+                                                    ),
                                                   ),
                                                 );
                                               },

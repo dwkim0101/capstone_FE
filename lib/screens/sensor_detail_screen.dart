@@ -47,19 +47,23 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
   }
 
   Future<void> _fetchHistory() async {
-    // 예시: 최근 1시간 스냅샷 (실제 시간대는 동적으로 생성 필요)
+    // 최근 1시간 스냅샷 (start, end)
     final now = DateTime.now();
-    final hour = DateTime(now.year, now.month, now.day, now.hour);
-    final snapshotHour = hour.toIso8601String();
+    final start = DateTime(now.year, now.month, now.day, now.hour);
+    final end = start.add(Duration(hours: 1));
+    final startStr = start.toIso8601String();
+    final endStr = end.toIso8601String();
     print(
-      '[_fetchHistory] GET: ${ApiConstants.sensorHourlySnapshot(widget.sensor.serialNumber, snapshotHour)}',
+      '[_fetchHistory] GET: '
+      '${ApiConstants.sensorHourlySnapshot(widget.sensor.serialNumber, startStr, endStr)}',
     );
     final res = await authorizedRequest(
       'GET',
       Uri.parse(
         ApiConstants.sensorHourlySnapshot(
           widget.sensor.serialNumber,
-          snapshotHour,
+          startStr,
+          endStr,
         ),
       ),
     );
@@ -116,11 +120,19 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.sensor.name} 상세')),
+      appBar: AppBar(
+        title: Text(
+          '${widget.sensor.name} 상세',
+          style: const TextStyle(color: Colors.white),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
       body:
           _loading
               ? const Center(child: CircularProgressIndicator())
-              : Padding(
+              : SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Card(
                   child: Padding(
@@ -134,12 +146,17 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
                             context,
                           ).textTheme.titleLarge?.copyWith(color: Colors.white),
                         ),
-                        const SizedBox(height: 16),
+                        const Divider(
+                          color: Colors.white24,
+                          thickness: 1,
+                          height: 28,
+                        ),
                         Text(
                           '실시간 데이터',
                           style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(color: Colors.white),
+                              ?.copyWith(color: Colors.white70),
                         ),
+                        const SizedBox(height: 8),
                         _data != null
                             ? Text(
                               _data.toString(),
@@ -149,12 +166,18 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
                               '데이터 없음',
                               style: TextStyle(color: Colors.white70),
                             ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
+                        const Divider(
+                          color: Colors.white24,
+                          thickness: 1,
+                          height: 28,
+                        ),
                         Text(
                           '이력',
                           style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(color: Colors.white),
+                              ?.copyWith(color: Colors.white70),
                         ),
+                        const SizedBox(height: 8),
                         _history != null
                             ? Column(
                               children:
@@ -173,12 +196,18 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
                               '이력 없음',
                               style: TextStyle(color: Colors.white70),
                             ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
+                        const Divider(
+                          color: Colors.white24,
+                          thickness: 1,
+                          height: 28,
+                        ),
                         Text(
                           '실시간 데이터(상태)',
                           style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(color: Colors.white),
+                              ?.copyWith(color: Colors.white70),
                         ),
+                        const SizedBox(height: 8),
                         _status != null
                             ? Text(
                               _status.toString(),
@@ -195,7 +224,10 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
                                 Theme.of(context).colorScheme.error,
                           ),
                           onPressed: _deleteSensor,
-                          child: const Text('센서 삭제'),
+                          child: const Text(
+                            '센서 삭제',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ),
                       ],
                     ),

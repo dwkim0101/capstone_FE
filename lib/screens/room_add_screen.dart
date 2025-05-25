@@ -12,13 +12,17 @@ class RoomAddScreen extends StatefulWidget {
 
 class _RoomAddScreenState extends State<RoomAddScreen> {
   final _nameController = TextEditingController();
+  final _latitudeController = TextEditingController();
+  final _longitudeController = TextEditingController();
   bool _loading = false;
 
   Future<void> _addRoom() async {
     print('[_addRoom] POST: ${ApiConstants.roomCreate}');
     final body = {
       'name': _nameController.text,
-      // 필요시 password, deviceControlEnabled, latitude, longitude 등 추가
+      'latitude': double.tryParse(_latitudeController.text),
+      'longitude': double.tryParse(_longitudeController.text),
+      // 필요시 password, deviceControlEnabled 등 추가
     };
     print('[_addRoom] body: ${json.encode(body)}');
     setState(() => _loading = true);
@@ -36,7 +40,13 @@ class _RoomAddScreenState extends State<RoomAddScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('방 추가')),
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('방 추가', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
       body:
           _loading
               ? const Center(child: CircularProgressIndicator())
@@ -46,16 +56,70 @@ class _RoomAddScreenState extends State<RoomAddScreen> {
                   children: [
                     TextField(
                       controller: _nameController,
-                      decoration: const InputDecoration(labelText: '방 이름'),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: '방 이름',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white24),
+                        ),
+                        focusedBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white),
+                        ),
+                      ),
+                      cursorColor: Colors.white,
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _latitudeController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: '위도 (예: 37.5665)',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white24),
+                        ),
+                        focusedBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white),
+                        ),
+                      ),
+                      keyboardType: TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      cursorColor: Colors.white,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _longitudeController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: '경도 (예: 126.9780)',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white24),
+                        ),
+                        focusedBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white),
+                        ),
+                      ),
+                      keyboardType: TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      cursorColor: Colors.white,
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         foregroundColor: Colors.white,
-                        backgroundColor: Colors.blue,
+                        backgroundColor: Color(0xFF3971FF),
+                        textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                        minimumSize: const Size.fromHeight(48),
                       ),
                       onPressed: _addRoom,
-                      child: const Text('추가'),
+                      child: const Text(
+                        '추가',
+                        style: TextStyle(color: Colors.white),
+                      ),
                     ),
                   ],
                 ),

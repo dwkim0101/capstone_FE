@@ -6,19 +6,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/api_client.dart';
 import '../theme/smartair_theme.dart';
-
-class Device {
-  final int deviceId;
-  final String alias;
-  Device({required this.deviceId, required this.alias});
-  factory Device.fromJson(Map<String, dynamic> json) => Device(
-    deviceId:
-        json['deviceId'] is int
-            ? json['deviceId']
-            : int.tryParse(json['deviceId'].toString()) ?? 0,
-    alias: json['alias'] ?? '',
-  );
-}
+import '../models/device.dart';
+import 'device_detail_screen.dart';
 
 class Score {
   final int value;
@@ -61,11 +50,13 @@ Future<Score> fetchRoomScore(int roomId) async {
 Future<List<Device>> fetchDeviceList(int roomId) async {
   final res = await authorizedRequest(
     'GET',
-    Uri.parse(ApiConstants.deviceList(roomId)),
+    Uri.parse(ApiConstants.thinqDeviceList(roomId)),
   );
   if (res.statusCode == 200) {
     final List data = json.decode(res.body);
     return data.map((e) => Device.fromJson(e)).toList();
+  } else if (res.statusCode == 403) {
+    throw Exception('403');
   } else {
     throw Exception('기기 목록 불러오기 실패');
   }
@@ -91,7 +82,7 @@ Future<List<Map<String, dynamic>>> fetchDeviceListWithStatus(int roomId) async {
   final devices = await fetchDeviceList(roomId);
   final List<Map<String, dynamic>> result = [];
   for (final device in devices) {
-    final status = await fetchDevicePowerStatus(device.deviceId);
+    final status = await fetchDevicePowerStatus(device.id);
     result.add({'device': device, 'status': status});
   }
   return result;
@@ -217,15 +208,15 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
   Color _statusColor(String status) {
     switch (status) {
       case '매우 좋음':
-        return Color(0xFF3971FF);
+        return Colors.white;
       case '좋음':
-        return Colors.green;
+        return Colors.white;
       case '보통':
-        return Colors.amber;
+        return Colors.white;
       case '나쁨':
-        return Colors.orange;
+        return Colors.white;
       case '매우 나쁨':
-        return Colors.red;
+        return Colors.white;
       default:
         return Colors.white;
     }
@@ -243,19 +234,38 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('기기 추가'),
+            backgroundColor: Colors.grey[900],
+            title: const Text('기기 추가', style: TextStyle(color: Colors.white)),
             content: TextField(
               controller: controller,
-              decoration: const InputDecoration(hintText: '기기명 입력'),
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: '기기명 입력',
+                hintStyle: TextStyle(color: Colors.white54),
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white),
+                ),
+              ),
+              cursorColor: Colors.white,
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('취소'),
+                child: const Text(
+                  '취소',
+                  style: TextStyle(color: Colors.white70),
+                ),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, controller.text),
-                child: const Text('추가'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF3971FF),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('추가', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -286,6 +296,72 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
           context,
         ).showSnackBar(const SnackBar(content: Text('기기 추가 완료')));
       }
+    }
+  }
+
+  Future<void> _showPatRegisterDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: Colors.grey[900],
+            title: const Text('PAT 등록', style: TextStyle(color: Colors.white)),
+            content: TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'PAT 값을 입력하세요',
+                hintStyle: TextStyle(color: Colors.white54),
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white),
+                ),
+              ),
+              cursorColor: Colors.white,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  '취소',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, controller.text),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF3971FF),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('등록', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+    );
+    if (result != null && result.trim().isNotEmpty) {
+      await _registerPat(result.trim());
+    }
+  }
+
+  Future<void> _registerPat(String pat) async {
+    final res = await authorizedRequest(
+      'POST',
+      Uri.parse('${ApiConstants.apiBase}/pat'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'pat': pat}),
+    );
+    if (res.statusCode == 200) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('PAT 등록 완료!')));
+      _refreshRoomData();
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('PAT 등록 실패')));
     }
   }
 
@@ -521,6 +597,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                       },
                     ),
                   ),
+                SizedBox(height: 12),
                 // 인사말
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -537,7 +614,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                           text: _user?['username'] ?? '유저님',
                           style: const TextStyle(color: Color(0xFF3971FF)),
                         ),
-                        const TextSpan(text: '\n오늘의 점수를 확인하세요.'),
+                        const TextSpan(text: ' 님. \n현재 대기점수를 확인하세요.'),
                       ],
                     ),
                   ),
@@ -551,7 +628,40 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       } else if (snapshot.hasError) {
-                        return Text('기기 오류: \\${snapshot.error}');
+                        final error = snapshot.error.toString();
+                        if (error.contains('403')) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '이 방의 기기 목록을 볼 권한이 없습니다.\n(PAT 등록 필요)',
+                                  style: const TextStyle(
+                                    color: Colors.redAccent,
+                                    fontSize: 16,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _showPatRegisterDialog,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Color(0xFF3971FF),
+                                    foregroundColor: Colors.white,
+                                    textStyle: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'PAT 등록하기',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return Text('기기 오류: $error');
                       } else if (snapshot.hasData) {
                         final devices = snapshot.data!;
                         return Padding(
@@ -618,107 +728,139 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                           mainAxisAlignment:
                                               MainAxisAlignment.spaceEvenly,
                                           children:
-                                              devices.map((item) {
-                                                final device =
-                                                    item['device'] as Device;
-                                                final status =
-                                                    item['status'] as String;
-                                                final isOn = status == 'ON';
-                                                return Column(
-                                                  children: [
-                                                    Container(
-                                                      width: 54,
-                                                      height: 54,
-                                                      decoration: BoxDecoration(
-                                                        color:
-                                                            isOn
-                                                                ? Color(
-                                                                  0xFF3971FF,
-                                                                )
-                                                                : Colors.white
-                                                                    .withOpacity(
-                                                                      0.18,
-                                                                    ),
-                                                        shape: BoxShape.circle,
-                                                        boxShadow: [
-                                                          if (isOn)
-                                                            BoxShadow(
-                                                              color: Color(
-                                                                0xFF3971FF,
-                                                              ).withOpacity(
-                                                                0.3,
+                                              devices
+                                                  .where(
+                                                    (item) =>
+                                                        (item['device']
+                                                                as Device)
+                                                            .isRegistered ==
+                                                        true,
+                                                  )
+                                                  .map((item) {
+                                                    final device =
+                                                        item['device']
+                                                            as Device;
+                                                    final status =
+                                                        item['status']
+                                                            as String;
+                                                    final isOn = status == 'ON';
+                                                    return Column(
+                                                      children: [
+                                                        Container(
+                                                          decoration: BoxDecoration(
+                                                            color:
+                                                                isOn
+                                                                    ? Color(
+                                                                      0xFF3971FF,
+                                                                    )
+                                                                    : Colors
+                                                                        .white
+                                                                        .withOpacity(
+                                                                          0.10,
+                                                                        ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  16,
+                                                                ),
+                                                          ),
+                                                          child: ListTile(
+                                                            leading: Container(
+                                                              width: 48,
+                                                              height: 48,
+                                                              decoration: BoxDecoration(
+                                                                color:
+                                                                    isOn
+                                                                        ? Color(
+                                                                          0xFF3971FF,
+                                                                        )
+                                                                        : Colors
+                                                                            .white
+                                                                            .withOpacity(
+                                                                              0.18,
+                                                                            ),
+                                                                shape:
+                                                                    BoxShape
+                                                                        .circle,
                                                               ),
-                                                              blurRadius: 12,
-                                                              offset: Offset(
-                                                                0,
-                                                                4,
+                                                              child: Icon(
+                                                                Icons.air,
+                                                                color:
+                                                                    isOn
+                                                                        ? Colors
+                                                                            .white
+                                                                        : Color(
+                                                                          0xFF3971FF,
+                                                                        ),
+                                                                size: 28,
                                                               ),
                                                             ),
-                                                        ],
-                                                      ),
-                                                      child: IconButton(
-                                                        icon: Icon(
-                                                          Icons.air,
-                                                          color:
-                                                              isOn
-                                                                  ? Colors.white
-                                                                  : Color(
+                                                            title: Text(
+                                                              device.name,
+                                                              style: const TextStyle(
+                                                                color:
+                                                                    Colors
+                                                                        .white,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                            ),
+                                                            enabled: true,
+                                                            onTap: () async {
+                                                              final result = await Navigator.push(
+                                                                context,
+                                                                MaterialPageRoute(
+                                                                  builder:
+                                                                      (
+                                                                        _,
+                                                                      ) => DeviceDetailScreen(
+                                                                        device: Device(
+                                                                          id:
+                                                                              device.id,
+                                                                          name:
+                                                                              device.name,
+                                                                          isActive:
+                                                                              isOn,
+                                                                          isRegistered:
+                                                                              device.isRegistered,
+                                                                        ),
+                                                                      ),
+                                                                ),
+                                                              );
+                                                              if (result ==
+                                                                  true)
+                                                                _refreshRoomData();
+                                                            },
+                                                            trailing: Switch(
+                                                              value: isOn,
+                                                              onChanged: (
+                                                                _,
+                                                              ) async {
+                                                                await toggleDevice(
+                                                                  device.id,
+                                                                );
+                                                                _refreshRoomData();
+                                                              },
+                                                              activeColor:
+                                                                  Color(
                                                                     0xFF3971FF,
                                                                   ),
-                                                          size: 28,
+                                                              inactiveThumbColor:
+                                                                  Colors
+                                                                      .white54,
+                                                              inactiveTrackColor:
+                                                                  Colors
+                                                                      .white24,
+                                                            ),
+                                                          ),
                                                         ),
-                                                        onPressed: () async {
-                                                          try {
-                                                            await toggleDevice(
-                                                              device.deviceId,
-                                                            );
-                                                            _refreshRoomData();
-                                                          } catch (e) {
-                                                            ScaffoldMessenger.of(
-                                                              context,
-                                                            ).showSnackBar(
-                                                              SnackBar(
-                                                                content: Text(
-                                                                  '기기 제어 실패: $e',
-                                                                ),
-                                                              ),
-                                                            );
-                                                          }
-                                                        },
-                                                        splashRadius: 28,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 8),
-                                                    Text(
-                                                      device.alias,
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        fontSize: 13,
-                                                      ),
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                    ),
-                                                    const SizedBox(height: 4),
-                                                    Text(
-                                                      isOn ? '켜짐' : '꺼짐',
-                                                      style: TextStyle(
-                                                        color:
-                                                            isOn
-                                                                ? Color(
-                                                                  0xFF3971FF,
-                                                                )
-                                                                : Colors
-                                                                    .white70,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                );
-                                              }).toList(),
+                                                        const SizedBox(
+                                                          height: 8,
+                                                        ),
+                                                      ],
+                                                    );
+                                                  })
+                                                  .toList(),
                                         ),
                               ),
                             ),
