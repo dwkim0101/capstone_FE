@@ -8,6 +8,7 @@ import '../utils/api_client.dart';
 import '../theme/smartair_theme.dart';
 import '../models/device.dart';
 import 'device_detail_screen.dart';
+import 'dart:async';
 
 class Score {
   final int value;
@@ -116,6 +117,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   Future<Score>? _scoreFuture;
   Future<List<Map<String, dynamic>>>? _deviceFutureWithStatus;
+  late Timer _scoreUpdateTimer;
 
   @override
   void initState() {
@@ -126,6 +128,14 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
     )..repeat(reverse: true);
     _fetchRoomsAndInit();
     _fetchUser();
+    // 점수 실시간 갱신 타이머
+    _scoreUpdateTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (_selectedRoomId != null) {
+        setState(() {
+          _scoreFuture = fetchRoomScore(_selectedRoomId!);
+        });
+      }
+    });
   }
 
   Future<void> _fetchRoomsAndInit() async {
@@ -188,6 +198,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
       _controller.stop();
     }
     _controller.dispose();
+    _scoreUpdateTimer.cancel();
     super.dispose();
   }
 
@@ -701,7 +712,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                               ),
                                               const SizedBox(height: 12),
                                               const Text(
-                                                '기기가 없습니다.',
+                                                '기기를 추가해주세요.',
                                                 style: TextStyle(
                                                   color: Colors.white70,
                                                   fontSize: 16,
