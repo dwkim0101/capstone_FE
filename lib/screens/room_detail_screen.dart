@@ -135,93 +135,65 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           } else if (snapshot.hasData) {
             final sensors = snapshot.data!;
             if (sensors.isEmpty) {
-              return const Center(
-                child: Text(
-                  '등록된 센서가 없습니다.',
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
-                ),
-              );
+              return const Center(child: Text('등록된 센서가 없습니다.'));
             }
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: sensors.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 18),
-                itemBuilder: (context, i) {
-                  final sensor = sensors[i];
-                  return GestureDetector(
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SensorDetailScreen(sensor: sensor),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.10),
-                            blurRadius: 12,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.room.name,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.copyWith(color: Colors.white),
                       ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 16,
-                        horizontal: 18,
+                      const SizedBox(height: 20),
+                      Text(
+                        '센서 목록',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: Colors.white70),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Colors.white12,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
+                      const Divider(
+                        color: Colors.white24,
+                        thickness: 1,
+                        height: 24,
+                      ),
+                      ...sensors.map(
+                        (sensor) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: ListTile(
+                            leading: const Icon(
                               Icons.sensors,
-                              color: Color(0xFF3971FF),
-                              size: 28,
+                              color: Colors.white,
                             ),
-                          ),
-                          const SizedBox(width: 18),
-                          Expanded(
-                            child: Text(
+                            title: Text(
                               sensor.name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(color: Colors.white),
                             ),
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => SensorDetailScreen(sensor: sensor),
+                                ),
+                              );
+                            },
                           ),
-                          const SizedBox(width: 12),
-                          const Icon(
-                            Icons.chevron_right,
-                            color: Colors.white38,
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    ],
+                  ),
+                ),
               ),
             );
           } else {
-            return const Center(
-              child: Text(
-                '알 수 없는 오류',
-                style: TextStyle(color: Colors.white70, fontSize: 16),
-              ),
-            );
+            return const Center(child: Text('알 수 없는 오류'));
           }
         },
       ),

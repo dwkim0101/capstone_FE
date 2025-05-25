@@ -487,103 +487,121 @@ class _DeviceTabState extends State<DeviceTab>
                             deviceProvider.deviceLoading[device.id] == true;
                         return Stack(
                           children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                color:
-                                    isOn
-                                        ? Color(0xFF3971FF)
-                                        : Colors.white.withOpacity(0.10),
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  if (isOn)
-                                    BoxShadow(
-                                      color: Color(
-                                        0xFF3971FF,
-                                      ).withOpacity(0.18),
-                                      blurRadius: 16,
-                                      offset: Offset(0, 6),
-                                    ),
-                                ],
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 16,
-                                horizontal: 18,
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color:
-                                          isOn ? Colors.white : Colors.white12,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      Icons.air,
-                                      color:
-                                          isOn
-                                              ? Color(0xFF3971FF)
-                                              : Colors.white54,
-                                      size: 28,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 18),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          device.name,
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          isOn ? '켜짐' : '꺼짐',
-                                          style: TextStyle(
-                                            color:
-                                                isOn
-                                                    ? Colors.white
-                                                    : Colors.white54,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
+                            GestureDetector(
+                              onTap:
                                   isLoading
-                                      ? SizedBox(
-                                        width: 32,
-                                        height: 32,
-                                        child: SizedBox.shrink(),
-                                      )
-                                      : Switch(
-                                        value: isOn,
-                                        onChanged:
-                                            isLoading
-                                                ? null
-                                                : (_) async {
-                                                  await Provider.of<
-                                                    DeviceProvider
-                                                  >(
-                                                    context,
-                                                    listen: false,
-                                                  ).toggleDevice(device.id);
-                                                },
-                                        activeColor: Colors.white,
-                                        activeTrackColor: Color(0xFF2351B5),
-                                        inactiveThumbColor: Colors.white54,
-                                        inactiveTrackColor: Colors.white24,
+                                      ? null
+                                      : () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (_) => DeviceDetailScreen(
+                                                  device: device,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color:
+                                      isOn
+                                          ? Color(0xFF3971FF)
+                                          : Colors.white.withOpacity(0.10),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    if (isOn)
+                                      BoxShadow(
+                                        color: Color(
+                                          0xFF3971FF,
+                                        ).withOpacity(0.18),
+                                        blurRadius: 16,
+                                        offset: Offset(0, 6),
                                       ),
-                                ],
+                                  ],
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                  horizontal: 18,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isOn
+                                                ? Colors.white
+                                                : Colors.white12,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.air,
+                                        color:
+                                            isOn
+                                                ? Color(0xFF3971FF)
+                                                : Colors.white54,
+                                        size: 28,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 18),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            device.name,
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            isOn ? '켜짐' : '꺼짐',
+                                            style: TextStyle(
+                                              color:
+                                                  isOn
+                                                      ? Colors.white
+                                                      : Colors.white54,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    isLoading
+                                        ? SizedBox(
+                                          width: 32,
+                                          height: 32,
+                                          child: SizedBox.shrink(),
+                                        )
+                                        : Switch(
+                                          value: isOn,
+                                          onChanged:
+                                              isLoading
+                                                  ? null
+                                                  : (_) async {
+                                                    await Provider.of<
+                                                      DeviceProvider
+                                                    >(
+                                                      context,
+                                                      listen: false,
+                                                    ).toggleDevice(device.id);
+                                                  },
+                                          activeColor: Colors.white,
+                                          activeTrackColor: Color(0xFF2351B5),
+                                          inactiveThumbColor: Colors.white54,
+                                          inactiveTrackColor: Colors.white24,
+                                        ),
+                                  ],
+                                ),
                               ),
                             ),
                             if (isLoading)
