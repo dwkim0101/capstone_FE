@@ -14,6 +14,8 @@ class ApiConstants {
   static String roomScore(int roomId) => '$apiBase/scores/room/$roomId';
   static String roomParticipants(int roomId) =>
       '$apiBase/room/$roomId/participants';
+  static String roomLatestScore(int roomId) =>
+      '$apiBase/scores/room/$roomId/latest';
 
   // Device (최신 명세)
   static String deviceList(int roomId) => '$apiBase/room/$roomId/devices';

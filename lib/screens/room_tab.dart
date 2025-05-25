@@ -90,7 +90,7 @@ class _RoomTabState extends State<RoomTab> {
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       foregroundColor: Colors.white,
-                      backgroundColor: Colors.blue,
+                      backgroundColor: Color(0xFF3971FF),
                     ),
                     onPressed: _fetchRooms,
                     child: const Text('다시 시도'),
@@ -114,7 +114,7 @@ class _RoomTabState extends State<RoomTab> {
               itemBuilder: (context, i) {
                 final room = rooms[i];
                 return Card(
-                  color: Colors.blue,
+                  color: Color(0xFF3971FF),
                   child: ListTile(
                     leading: const Icon(
                       Icons.meeting_room,

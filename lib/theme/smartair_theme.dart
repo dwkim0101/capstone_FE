@@ -12,7 +12,7 @@ class SmartAirColors {
 
 final ThemeData smartAirTheme = ThemeData(
   primaryColor: SmartAirColors.primary,
-  scaffoldBackgroundColor: SmartAirColors.background,
+  scaffoldBackgroundColor: const Color(0xFF23272F),
   fontFamily: 'SUIT',
   textTheme: const TextTheme(
     displayLarge: TextStyle(
@@ -54,12 +54,12 @@ final ThemeData smartAirTheme = ThemeData(
   colorScheme: ColorScheme.fromSwatch(
     primarySwatch: Colors.blue,
     accentColor: SmartAirColors.accent,
-    backgroundColor: SmartAirColors.background,
+    backgroundColor: Color(0xFF23272F),
     errorColor: SmartAirColors.error,
   ).copyWith(
     primary: SmartAirColors.primary,
     secondary: SmartAirColors.accent,
-    surface: SmartAirColors.background,
+    surface: Color(0xFF23272F),
     error: SmartAirColors.error,
   ),
   elevatedButtonTheme: ElevatedButtonThemeData(
@@ -78,6 +78,13 @@ final ThemeData smartAirTheme = ThemeData(
     elevation: 8,
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.all(Radius.circular(24)),
+    ),
+  ),
+  floatingActionButtonTheme: const FloatingActionButtonThemeData(
+    backgroundColor: Color(0xFF3971FF),
+    foregroundColor: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(16)),
     ),
   ),
 );

@@ -5,6 +5,7 @@ import '../utils/api_constants.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/api_client.dart';
+import '../theme/smartair_theme.dart';
 
 class Device {
   final int deviceId;
@@ -28,15 +29,12 @@ class Score {
 }
 
 Future<Score> fetchRoomScore(int roomId) async {
-  final uri = Uri.parse(
-    ApiConstants.roomScore(roomId),
-  ).replace(queryParameters: {'page': '0', 'size': '10', 'sort': 'id,desc'});
+  final uri = Uri.parse(ApiConstants.roomLatestScore(roomId));
   final res = await authorizedRequest('GET', uri);
   if (res.statusCode == 200) {
     final data = json.decode(res.body);
-    if (data is Map && data['content'] is List && data['content'].isNotEmpty) {
-      final latest = data['content'].last;
-      final scoreValue = (latest['overallScore'] as num?)?.toInt() ?? 0;
+    if (data is Map && data['overallScore'] != null) {
+      final scoreValue = (data['overallScore'] as num?)?.toInt() ?? 0;
       // 점수 구간별 상태 한글 가공
       String status;
       if (scoreValue >= 90) {
@@ -216,6 +214,23 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
     }
   }
 
+  Color _statusColor(String status) {
+    switch (status) {
+      case '매우 좋음':
+        return Color(0xFF3971FF);
+      case '좋음':
+        return Colors.green;
+      case '보통':
+        return Colors.amber;
+      case '나쁨':
+        return Colors.orange;
+      case '매우 나쁨':
+        return Colors.red;
+      default:
+        return Colors.white;
+    }
+  }
+
   Future<void> _showAddDeviceDialog() async {
     if (_selectedRoomId == null) {
       ScaffoldMessenger.of(
@@ -359,18 +374,48 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                             Text(
                               score.value.toString(),
                               style: TextStyle(
-                                fontSize: 48,
-                                fontWeight: FontWeight.bold,
-                                color: _scoreColor(score.value),
+                                fontSize: 54,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: 1.5,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withOpacity(0.5),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
+                                  Shadow(
+                                    color: _scoreColor(
+                                      score.value,
+                                    ).withOpacity(0.4),
+                                    blurRadius: 18,
+                                    offset: Offset(0, 0),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: 10),
                             Text(
                               score.status,
                               style: TextStyle(
-                                fontSize: 15,
-                                color: _scoreColor(score.value),
-                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: _statusColor(score.status),
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.2,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withOpacity(0.4),
+                                    blurRadius: 6,
+                                    offset: Offset(0, 1),
+                                  ),
+                                  Shadow(
+                                    color: _scoreColor(
+                                      score.value,
+                                    ).withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: Offset(0, 0),
+                                  ),
+                                ],
                               ),
                             ),
                           ],

@@ -25,7 +25,7 @@ Future<List<Sensor>> fetchSensorList(int roomId) async {
   print('[fetchSensorList] roomId: $roomId');
   final res = await authorizedRequest(
     'GET',
-    Uri.parse('${ApiConstants.sensorList}?roomId=$roomId'),
+    Uri.parse('${ApiConstants.apiBase}/room/$roomId/sensors'),
   );
   print('[fetchSensorList] status: \'${res.statusCode}\', body: ${res.body}');
   if (res.statusCode == 200) {
@@ -87,15 +87,27 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       const Icon(Icons.error, color: Colors.red, size: 48),
                       const SizedBox(height: 16),
                       Text(
                         '센서 목록을 불러올 수 없습니다.',
-                        style: Theme.of(context).textTheme.bodyLarge,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3971FF),
+                          foregroundColor: Colors.white,
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          minimumSize: const Size.fromHeight(48),
+                        ),
                         onPressed: _refresh,
                         child: const Text('다시 시도'),
                       ),
@@ -119,20 +131,28 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                     children: [
                       Text(
                         widget.room.name,
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.copyWith(color: Colors.white),
                       ),
                       const SizedBox(height: 16),
                       Text(
                         '센서 목록',
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium?.copyWith(color: Colors.white),
                       ),
                       const SizedBox(height: 8),
                       ...sensors.map(
                         (sensor) => ListTile(
-                          leading: const Icon(Icons.sensors),
+                          leading: const Icon(
+                            Icons.sensors,
+                            color: Colors.white,
+                          ),
                           title: Text(
                             sensor.name,
-                            style: Theme.of(context).textTheme.bodyLarge,
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(color: Colors.white),
                           ),
                           onTap: () async {
                             await Navigator.push(

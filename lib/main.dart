@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
           surface: const Color(0xFF23272F),
         ),
       ),
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.dark,
       home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
     );
