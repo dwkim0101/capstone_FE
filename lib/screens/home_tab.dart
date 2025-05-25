@@ -7,14 +7,15 @@ import 'package:http/http.dart' as http;
 import '../utils/api_client.dart';
 
 class Device {
-  final String id;
-  final String name;
-  final bool isActive;
-  Device({required this.id, required this.name, required this.isActive});
+  final int deviceId;
+  final String alias;
+  Device({required this.deviceId, required this.alias});
   factory Device.fromJson(Map<String, dynamic> json) => Device(
-    id: json['id'].toString(),
-    name: json['name'],
-    isActive: json['isActive'] ?? json['status'] == 'on',
+    deviceId:
+        json['deviceId'] is int
+            ? json['deviceId']
+            : int.tryParse(json['deviceId'].toString()) ?? 0,
+    alias: json['alias'] ?? '',
   );
 }
 
@@ -27,12 +28,33 @@ class Score {
 }
 
 Future<Score> fetchRoomScore(int roomId) async {
-  final res = await authorizedRequest(
-    'GET',
-    Uri.parse(ApiConstants.roomScore(roomId)),
-  );
+  final uri = Uri.parse(
+    ApiConstants.roomScore(roomId),
+  ).replace(queryParameters: {'page': '0', 'size': '10', 'sort': 'id,desc'});
+  final res = await authorizedRequest('GET', uri);
   if (res.statusCode == 200) {
-    return Score.fromJson(json.decode(res.body));
+    final data = json.decode(res.body);
+    if (data is Map && data['content'] is List && data['content'].isNotEmpty) {
+      final latest = data['content'].last;
+      final scoreValue = (latest['overallScore'] as num?)?.toInt() ?? 0;
+      // 점수 구간별 상태 한글 가공
+      String status;
+      if (scoreValue >= 90) {
+        status = '매우 좋음';
+      } else if (scoreValue >= 70) {
+        status = '좋음';
+      } else if (scoreValue >= 50) {
+        status = '보통';
+      } else if (scoreValue >= 30) {
+        status = '나쁨';
+      } else {
+        status = '매우 나쁨';
+      }
+      return Score(value: scoreValue, status: status);
+    } else {
+      // 점수 데이터 없음: null 반환
+      return Future.error('NO_SCORE_DATA');
+    }
   } else {
     throw Exception('점수 불러오기 실패');
   }
@@ -51,15 +73,17 @@ Future<List<Device>> fetchDeviceList(int roomId) async {
   }
 }
 
-Future<void> toggleDevice(String deviceId, bool isOn) async {
-  final res = await authorizedRequest(
-    'POST',
-    Uri.parse(ApiConstants.deviceControl),
-    headers: {'Content-Type': 'application/json'},
-    body: json.encode({'id': deviceId, 'on': isOn}),
-  );
-  if (res.statusCode != 200) {
-    throw Exception('기기 제어 실패');
+Future<void> toggleDevice(int deviceId) async {
+  try {
+    final res = await authorizedRequest(
+      'POST',
+      Uri.parse('${ApiConstants.baseUrl}/thinq/power/$deviceId'),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('기기 제어 실패');
+    }
+  } catch (e) {
+    rethrow;
   }
 }
 
@@ -98,8 +122,15 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
       final rooms = json.decode(res.body);
       setState(() {
         _rooms = rooms;
-        if (rooms.isNotEmpty) {
-          _selectedRoomId = rooms[0]['id'];
+        if (_rooms.isNotEmpty) {
+          final validIds =
+              _rooms
+                  .where((r) => r['id'] is int)
+                  .map<int>((r) => r['id'] as int)
+                  .toSet();
+          if (_selectedRoomId == null || !validIds.contains(_selectedRoomId)) {
+            _selectedRoomId = _rooms[0]['id'];
+          }
           _refreshRoomData();
         }
       });
@@ -145,6 +176,20 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
+  Color _scoreColor(int value) {
+    if (value >= 90) {
+      return const Color(0xFF3971FF); // 매우 좋음: 파랑
+    } else if (value >= 70) {
+      return Colors.green; // 좋음
+    } else if (value >= 50) {
+      return Colors.yellow; // 보통
+    } else if (value >= 30) {
+      return Colors.orange; // 나쁨
+    } else {
+      return Colors.red; // 매우 나쁨
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -163,28 +208,37 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
           ),
           // 공기 점수 뒤 애니메이션 원
           if (_controller.isAnimating)
-            Center(
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  AnimatedBuilder(
-                    animation: _controller,
-                    builder: (context, child) {
-                      return CustomPaint(
-                        size: MediaQuery.of(context).size,
-                        painter: _CircleGradientPainterDark(
-                          progress: _controller.value,
-                          gradientColors: [Colors.white, Colors.white],
-                        ),
-                      );
-                    },
+            FutureBuilder<Score>(
+              future: _scoreFuture,
+              builder: (context, snapshot) {
+                final color =
+                    (snapshot.hasData)
+                        ? _scoreColor(snapshot.data!.value)
+                        : Colors.white;
+                return Center(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      AnimatedBuilder(
+                        animation: _controller,
+                        builder: (context, child) {
+                          return CustomPaint(
+                            size: MediaQuery.of(context).size,
+                            painter: _CircleGradientPainterDark(
+                              progress: _controller.value,
+                              gradientColors: [color, color],
+                            ),
+                          );
+                        },
+                      ),
+                      BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        child: Container(color: Colors.transparent),
+                      ),
+                    ],
                   ),
-                  BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(color: Colors.transparent),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           // 공기 점수 (화면 정중앙)
           Center(
@@ -203,40 +257,35 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const CircularProgressIndicator();
                       } else if (snapshot.hasError) {
+                        if (snapshot.error == 'NO_SCORE_DATA') {
+                          return const Text(
+                            '점수 데이터 없음',
+                            style: TextStyle(color: Colors.white70),
+                          );
+                        }
                         return Text('점수 오류: \\${snapshot.error}');
                       } else if (snapshot.hasData) {
                         final score = snapshot.data!;
-                        return Text(
-                          score.value.toString(),
-                          style: const TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        );
-                      } else {
-                        return const SizedBox();
-                      }
-                    },
-                  ),
-                const SizedBox(height: 8),
-                if (_scoreFuture != null)
-                  FutureBuilder<Score>(
-                    future: _scoreFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const CircularProgressIndicator();
-                      } else if (snapshot.hasError) {
-                        return Text('점수 오류: \\${snapshot.error}');
-                      } else if (snapshot.hasData) {
-                        final score = snapshot.data!;
-                        return Text(
-                          score.status,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        return Column(
+                          children: [
+                            Text(
+                              score.value.toString(),
+                              style: TextStyle(
+                                fontSize: 48,
+                                fontWeight: FontWeight.bold,
+                                color: _scoreColor(score.value),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              score.status,
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: _scoreColor(score.value),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         );
                       } else {
                         return const SizedBox();
@@ -278,21 +327,64 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                 if (_rooms.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: DropdownButton<int>(
-                      value: _selectedRoomId,
-                      dropdownColor: Colors.black,
-                      style: const TextStyle(color: Colors.white),
-                      items:
-                          _rooms.map<DropdownMenuItem<int>>((room) {
-                            return DropdownMenuItem(
-                              value: room['id'],
-                              child: Text(
-                                room['name'],
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            );
-                          }).toList(),
-                      onChanged: _onRoomSelected,
+                    child: Builder(
+                      builder: (context) {
+                        final validRoomIds =
+                            _rooms
+                                .where((r) => r['id'] is int)
+                                .map<int>((r) => r['id'] as int)
+                                .toSet();
+                        final dropdownItems =
+                            validRoomIds.map((id) {
+                              final room = _rooms.firstWhere(
+                                (r) => r['id'] == id,
+                              );
+                              return DropdownMenuItem<int>(
+                                value: id,
+                                child: Text(
+                                  room['name'],
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              );
+                            }).toList();
+                        int? dropdownValue = _selectedRoomId;
+                        if (dropdownItems.isEmpty) {
+                          dropdownValue = null;
+                        } else if (dropdownValue == null ||
+                            dropdownItems
+                                    .where(
+                                      (item) => item.value == dropdownValue,
+                                    )
+                                    .length !=
+                                1) {
+                          dropdownValue = dropdownItems.first.value;
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (_selectedRoomId != dropdownValue) {
+                              setState(() {
+                                _selectedRoomId = dropdownValue;
+                                _refreshRoomData();
+                              });
+                            }
+                          });
+                        }
+                        return DropdownButton<int>(
+                          value: dropdownValue,
+                          isExpanded: true,
+                          dropdownColor: Colors.black,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                          ),
+                          items: dropdownItems,
+                          onChanged: (v) {
+                            if (v != null) _onRoomSelected(v);
+                          },
+                          hint: const Text(
+                            '방 선택',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 // 인사말
@@ -316,7 +408,8 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                // const SizedBox(height: 24),
+                Spacer(),
                 // 기기 카드
                 if (_deviceFuture != null)
                   FutureBuilder<List<Device>>(
@@ -334,24 +427,26 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                               devices.map((device) {
                                 return GestureDetector(
                                   onTap: () async {
-                                    await toggleDevice(
-                                      device.id,
-                                      !device.isActive,
-                                    );
-                                    _refreshRoomData();
+                                    try {
+                                      await toggleDevice(device.deviceId);
+                                      _refreshRoomData();
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(content: Text('기기 제어 실패: $e')),
+                                      );
+                                    }
                                   },
                                   child: Card(
-                                    color:
-                                        device.isActive
-                                            ? Colors.blue
-                                            : Colors.grey,
+                                    color: Colors.black.withOpacity(0.2),
                                     child: Padding(
                                       padding: const EdgeInsets.all(16.0),
                                       child: Column(
                                         children: [
                                           Icon(Icons.air, color: Colors.white),
                                           Text(
-                                            device.name,
+                                            device.alias,
                                             style: const TextStyle(
                                               color: Colors.white,
                                             ),
@@ -368,6 +463,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                       }
                     },
                   ),
+                const SizedBox(height: 24),
               ],
             ),
           ),

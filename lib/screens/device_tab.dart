@@ -43,14 +43,11 @@ Future<List<Device>> fetchDeviceList(int roomId) async {
   }
 }
 
-Future<void> toggleDevice(String deviceId, bool isOn) async {
-  print('[toggleDevice] POST: ${ApiConstants.deviceControl}');
-  print('[toggleDevice] body: ${json.encode({'id': deviceId, 'on': isOn})}');
+Future<void> toggleDevice(int deviceId) async {
+  print('[toggleDevice] POST: /thinq/power/[36m$deviceId[0m');
   final res = await authorizedRequest(
     'POST',
-    Uri.parse(ApiConstants.deviceControl),
-    headers: {'Content-Type': 'application/json'},
-    body: json.encode({'id': deviceId, 'on': isOn}),
+    Uri.parse('${ApiConstants.baseUrl}/thinq/power/$deviceId'),
   );
   print('[toggleDevice] status: \'${res.statusCode}\', body: ${res.body}');
   if (res.statusCode != 200) {
@@ -87,8 +84,15 @@ class _DeviceTabState extends State<DeviceTab>
       final rooms = json.decode(res.body);
       setState(() {
         _rooms = rooms;
-        if (rooms.isNotEmpty) {
-          _selectedRoomId = rooms[0]['id'];
+        if (_rooms.isNotEmpty) {
+          final validIds =
+              _rooms
+                  .where((r) => r['id'] is int)
+                  .map<int>((r) => r['id'] as int)
+                  .toSet();
+          if (_selectedRoomId == null || !validIds.contains(_selectedRoomId)) {
+            _selectedRoomId = _rooms[0]['id'];
+          }
           _fetchDevices();
         }
         _loading = false;
@@ -181,6 +185,7 @@ class _DeviceTabState extends State<DeviceTab>
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'device_fab',
         onPressed: _showAddDeviceDialog,
         child: const Icon(Icons.add),
       ),
@@ -201,19 +206,54 @@ class _DeviceTabState extends State<DeviceTab>
                     ),
                   ),
                   const SizedBox(height: 4),
-                  DropdownButton<int>(
-                    value: _selectedRoomId,
-                    isExpanded: true,
-                    dropdownColor: Colors.black,
-                    style: const TextStyle(color: Colors.white, fontSize: 15),
-                    items:
-                        _rooms.map<DropdownMenuItem<int>>((room) {
-                          return DropdownMenuItem(
-                            value: room['id'],
-                            child: Text(room['name']),
-                          );
-                        }).toList(),
-                    onChanged: _onRoomSelected,
+                  Builder(
+                    builder: (context) {
+                      final validRoomIds =
+                          _rooms
+                              .where((r) => r['id'] is int)
+                              .map<int>((r) => r['id'] as int)
+                              .toSet();
+                      final dropdownItems =
+                          validRoomIds.map((id) {
+                            final room = _rooms.firstWhere(
+                              (r) => r['id'] == id,
+                            );
+                            return DropdownMenuItem<int>(
+                              value: id,
+                              child: Text(room['name']),
+                            );
+                          }).toList();
+                      int? dropdownValue;
+                      if (dropdownItems.isNotEmpty &&
+                          _selectedRoomId != null &&
+                          dropdownItems
+                                  .where(
+                                    (item) => item.value == _selectedRoomId,
+                                  )
+                                  .length ==
+                              1) {
+                        dropdownValue = _selectedRoomId;
+                      } else {
+                        dropdownValue = null;
+                      }
+                      return DropdownButton<int>(
+                        value: dropdownValue,
+                        isExpanded: true,
+                        dropdownColor: Colors.black,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                        items: dropdownItems,
+                        onChanged: (v) {
+                          if (v != null) _onRoomSelected(v);
+                        },
+                        hint: const Text(
+                          '방 선택',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

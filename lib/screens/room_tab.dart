@@ -60,6 +60,7 @@ class _RoomTabState extends State<RoomTab> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'room_fab',
         onPressed: () async {
           final result = await Navigator.push(
             context,

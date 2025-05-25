@@ -22,7 +22,7 @@ Future<Room> fetchRoomDetail(int roomId) async {
 }
 
 Future<List<Sensor>> fetchSensorList(int roomId) async {
-  print('[fetchSensorList] GET: ${ApiConstants.sensorList}?roomId=$roomId');
+  print('[fetchSensorList] roomId: $roomId');
   final res = await authorizedRequest(
     'GET',
     Uri.parse('${ApiConstants.sensorList}?roomId=$roomId'),

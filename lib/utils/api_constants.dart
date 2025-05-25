@@ -15,9 +15,8 @@ class ApiConstants {
   static String roomParticipants(int roomId) =>
       '$apiBase/room/$roomId/participants';
 
-  // Device
-  static String deviceList(int roomId) =>
-      '$baseUrl/thinq/devices/$roomId?deviceId=$roomId';
+  // Device (최신 명세)
+  static String deviceList(int roomId) => '$apiBase/room/$roomId/devices';
   static String devicePower(int deviceId) => '$baseUrl/thinq/power/$deviceId';
   static const String deviceListAll = '$apiBase/device/list';
   static const String deviceControl = '$apiBase/device/control';
@@ -27,6 +26,12 @@ class ApiConstants {
   static const String sensorCreate = '$baseUrl/sensor';
   static const String sensorDelete = '$baseUrl/sensor';
   static String sensorScore(String serial) => '$apiBase/scores/sensor/$serial';
+  // 센서 실시간 데이터 (최신 스냅샷)
+  static String sensorLatestSnapshot(String serial) =>
+      '$apiBase/snapshots/latest/$serial';
+  // 센서 시간별 스냅샷 (hour: 'YYYY-MM-DDTHH:00:00' 형식)
+  static String sensorHourlySnapshot(String serial, String hour) =>
+      '$apiBase/snapshots/$serial/$hour';
 
   // Stats/Reports
   static String dailyReport(String serial) => '$apiBase/reports/daily/$serial';

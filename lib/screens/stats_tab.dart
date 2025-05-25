@@ -40,10 +40,20 @@ class _StatsTabState extends State<StatsTab>
     );
     if (res.statusCode == 200) {
       final rooms = json.decode(res.body);
+      print('방 리스트: \\${rooms.map((r) => r['id']).toList()}');
       setState(() {
         _rooms = rooms;
-        if (rooms.isNotEmpty && rooms[0]['id'] != null) {
-          _selectedRoomId = rooms[0]['id'];
+        if (_rooms.isNotEmpty) {
+          final validIds =
+              _rooms
+                  .where((r) => r['id'] is int)
+                  .map<int>((r) => r['id'] as int)
+                  .toSet();
+          print('validIds: $validIds');
+          if (_selectedRoomId == null || !validIds.contains(_selectedRoomId)) {
+            _selectedRoomId = _rooms[0]['id'];
+          }
+          print('_selectedRoomId: $_selectedRoomId');
           _sensorFuture = fetchSensorList(_selectedRoomId!);
           _fetchStats();
         } else {
@@ -71,9 +81,11 @@ class _StatsTabState extends State<StatsTab>
   }
 
   void _onRoomSelected(int? roomId) {
+    print('방 선택됨: $roomId');
     if (roomId == null) return;
     setState(() {
       _selectedRoomId = roomId;
+      print('선택된 roomId로 fetchSensorList 호출: $roomId');
       _sensorFuture = fetchSensorList(roomId);
       _fetchStats();
     });
@@ -116,19 +128,58 @@ class _StatsTabState extends State<StatsTab>
                     ),
                   ),
                   const SizedBox(height: 4),
-                  DropdownButton<int>(
-                    value: _selectedRoomId,
-                    isExpanded: true,
-                    dropdownColor: Colors.black,
-                    style: const TextStyle(color: Colors.white, fontSize: 15),
-                    items:
-                        _rooms.map<DropdownMenuItem<int>>((room) {
-                          return DropdownMenuItem(
-                            value: room['id'],
-                            child: Text(room['name']),
-                          );
-                        }).toList(),
-                    onChanged: _onRoomSelected,
+                  Builder(
+                    builder: (context) {
+                      final validRoomIds =
+                          _rooms
+                              .where((r) => r['id'] is int)
+                              .map<int>((r) => r['id'] as int)
+                              .toSet();
+                      final dropdownItems =
+                          validRoomIds.map((id) {
+                            final room = _rooms.firstWhere(
+                              (r) => r['id'] == id,
+                            );
+                            return DropdownMenuItem<int>(
+                              value: id,
+                              child: Text(room['name']),
+                            );
+                          }).toList();
+                      int? dropdownValue = _selectedRoomId;
+                      if (dropdownItems.isEmpty) {
+                        dropdownValue = null;
+                      } else if (dropdownValue == null ||
+                          dropdownItems
+                                  .where((item) => item.value == dropdownValue)
+                                  .length !=
+                              1) {
+                        dropdownValue = dropdownItems.first.value;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_selectedRoomId != dropdownValue) {
+                            setState(() {
+                              _selectedRoomId = dropdownValue;
+                            });
+                          }
+                        });
+                      }
+                      return DropdownButton<int>(
+                        value: dropdownValue,
+                        isExpanded: true,
+                        dropdownColor: Colors.black,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                        items: dropdownItems,
+                        onChanged: (v) {
+                          if (v != null) _onRoomSelected(v);
+                        },
+                        hint: const Text(
+                          '방 선택',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -166,7 +217,19 @@ class _StatsTabState extends State<StatsTab>
                     });
                   }
                   return DropdownButton<String>(
-                    value: sensors.isEmpty ? null : _selectedSensorSerial,
+                    value:
+                        sensors.isEmpty
+                            ? null
+                            : (sensors
+                                        .where(
+                                          (s) =>
+                                              s.serialNumber ==
+                                              _selectedSensorSerial,
+                                        )
+                                        .length ==
+                                    1
+                                ? _selectedSensorSerial
+                                : sensors[0].serialNumber),
                     hint: const Text(
                       '센서 선택',
                       style: TextStyle(color: Colors.white),
@@ -218,10 +281,12 @@ Future<List<Room>> fetchRoomList() async {
 }
 
 Future<List<Sensor>> fetchSensorList(int roomId) async {
+  print('[fetchSensorList] roomId: $roomId');
   final res = await authorizedRequest(
     'GET',
     Uri.parse('${ApiConstants.sensorList}?roomId=$roomId'),
   );
+  print('[fetchSensorList] status: \'${res.statusCode}\', body: ${res.body}');
   if (res.statusCode == 200) {
     final List data = json.decode(res.body);
     return data.map((e) => Sensor.fromJson(e)).toList();

@@ -16,24 +16,24 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
   Map<String, dynamic>? _data;
   List<dynamic>? _history;
   bool _loading = false;
+  Map<String, dynamic>? _status;
 
   @override
   void initState() {
     super.initState();
     _fetchData();
     _fetchHistory();
+    _fetchStatus();
   }
 
   Future<void> _fetchData() async {
     print(
-      '[_fetchData] GET: ${ApiConstants.sensorCreate}/data?id=${widget.sensor.serialNumber}',
+      '[_fetchData] GET: ${ApiConstants.sensorLatestSnapshot(widget.sensor.serialNumber)}',
     );
     setState(() => _loading = true);
     final res = await authorizedRequest(
       'GET',
-      Uri.parse(
-        '${ApiConstants.sensorCreate}/data?id=${widget.sensor.serialNumber}',
-      ),
+      Uri.parse(ApiConstants.sensorLatestSnapshot(widget.sensor.serialNumber)),
     );
     print('[_fetchData] status: \'${res.statusCode}\', body: ${res.body}');
     if (res.statusCode == 200) {
@@ -47,13 +47,20 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
   }
 
   Future<void> _fetchHistory() async {
+    // 예시: 최근 1시간 스냅샷 (실제 시간대는 동적으로 생성 필요)
+    final now = DateTime.now();
+    final hour = DateTime(now.year, now.month, now.day, now.hour);
+    final snapshotHour = hour.toIso8601String();
     print(
-      '[_fetchHistory] GET: ${ApiConstants.sensorCreate}/data/history?id=${widget.sensor.serialNumber}',
+      '[_fetchHistory] GET: ${ApiConstants.sensorHourlySnapshot(widget.sensor.serialNumber, snapshotHour)}',
     );
     final res = await authorizedRequest(
       'GET',
       Uri.parse(
-        '${ApiConstants.sensorCreate}/data/history?id=${widget.sensor.serialNumber}',
+        ApiConstants.sensorHourlySnapshot(
+          widget.sensor.serialNumber,
+          snapshotHour,
+        ),
       ),
     );
     print('[_fetchHistory] status: \'${res.statusCode}\', body: ${res.body}');
@@ -61,6 +68,32 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
       setState(() {
         _history = json.decode(res.body);
       });
+    }
+  }
+
+  Future<void> _fetchStatus() async {
+    print(
+      '[fetchStatus] GET: /sensor/status?deviceSerialNumber=${widget.sensor.serialNumber}',
+    );
+    final res = await authorizedRequest(
+      'GET',
+      Uri.parse(
+        '${ApiConstants.baseUrl}/sensor/status?deviceSerialNumber=${widget.sensor.serialNumber}',
+      ),
+    );
+    print('[fetchStatus] status: \'${res.statusCode}\', body: ${res.body}');
+    if (res.statusCode == 200) {
+      try {
+        final decoded = json.decode(res.body);
+        setState(() {
+          _status = decoded is Map<String, dynamic> ? decoded : null;
+        });
+      } catch (e) {
+        print('센서 상태 JSON 파싱 에러: $e');
+        setState(() {
+          _status = null;
+        });
+      }
     }
   }
 
@@ -109,6 +142,15 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
                       ..._history!.map((e) => Text(e.toString()))
                     else
                       const Text('이력 없음'),
+                    const SizedBox(height: 24),
+                    const Text(
+                      '실시간 데이터(상태)',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    if (_status != null)
+                      Text(_status.toString())
+                    else
+                      const Text('상태 정보 없음'),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
