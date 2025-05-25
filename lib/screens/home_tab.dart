@@ -10,6 +10,7 @@ import '../models/device.dart';
 import 'device_detail_screen.dart';
 import 'dart:async';
 import 'package:animated_flip_counter/animated_flip_counter.dart';
+import 'package:provider/provider.dart';
 
 class Score {
   final int value;
@@ -121,7 +122,6 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
   late AnimationController controller0;
   int? _scoreValue;
   String? _scoreStatus;
-  Future<List<Map<String, dynamic>>>? deviceFutureWithStatus;
   late Timer scoreUpdateTimer;
 
   @override
@@ -192,7 +192,9 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
   void refreshRoomData() {
     if (selectedRoomId == null) return;
     fetchAndSetScore();
-    deviceFutureWithStatus = fetchDeviceListWithStatus(selectedRoomId!);
+    // Provider로 기기 리스트 fetch
+    final deviceProvider = Provider.of<DeviceProvider>(context, listen: false);
+    deviceProvider.fetchDevices(selectedRoomId!);
   }
 
   Future<void> fetchUser() async {
@@ -639,154 +641,112 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                 ),
                 Spacer(),
                 // 기기 카드
-                if (deviceFutureWithStatus != null)
-                  FutureBuilder<List<Map<String, dynamic>>>(
-                    future: deviceFutureWithStatus,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: Text(
-                            '조회중 ...',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                            ),
-                          ),
-                        );
-                      } else if (snapshot.hasError) {
-                        final error = snapshot.error.toString();
-                        if (error.contains('403')) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '이 방의 기기 목록을 볼 권한이 없습니다.\n(PAT 등록 필요)',
-                                  style: const TextStyle(
-                                    color: Colors.redAccent,
-                                    fontSize: 16,
-                                  ),
-                                  textAlign: TextAlign.center,
+                Consumer<DeviceProvider>(
+                  builder: (context, deviceProvider, _) {
+                    if (deviceProvider.loading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final filteredDevices =
+                        deviceProvider.devices
+                            .where((d) => d.isRegistered == true)
+                            .toList();
+                    if (filteredDevices.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.12),
                                 ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: showPatRegisterDialog,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Color(0xFF3971FF),
-                                    foregroundColor: Colors.white,
-                                    textStyle: TextStyle(
-                                      fontWeight: FontWeight.bold,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 20,
+                                horizontal: 12,
+                              ),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const SizedBox(height: 8),
+                                    Icon(
+                                      Icons.devices_other,
+                                      color: Colors.white38,
+                                      size: 40,
                                     ),
-                                  ),
-                                  child: const Text(
-                                    'PAT 등록하기',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                        return Text('기기 오류: $error');
-                      } else if (snapshot.hasData) {
-                        final devices = snapshot.data!;
-                        final filteredDevices =
-                            devices
-                                .where(
-                                  (item) =>
-                                      (item['device'] as Device).isRegistered ==
-                                      true,
-                                )
-                                .toList();
-                        if (devices.isEmpty || filteredDevices.isEmpty) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(
-                                  sigmaX: 12,
-                                  sigmaY: 12,
-                                ),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.08),
-                                    borderRadius: BorderRadius.circular(24),
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.12),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      '기기를 추가해주세요.',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 16,
+                                      ),
                                     ),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 20,
-                                    horizontal: 12,
-                                  ),
-                                  child: SizedBox(
-                                    width: double.infinity,
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const SizedBox(height: 8),
-                                        Icon(
-                                          Icons.devices_other,
-                                          color: Colors.white38,
-                                          size: 40,
-                                        ),
-                                        const SizedBox(height: 12),
-                                        const Text(
-                                          '기기를 추가해주세요.',
+                                    const SizedBox(height: 8),
+                                    if (rooms0.isEmpty)
+                                      const Padding(
+                                        padding: EdgeInsets.only(top: 8.0),
+                                        child: Text(
+                                          '방을 먼저 추가하세요.',
                                           style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 16,
+                                            color: Colors.white54,
+                                            fontSize: 13,
                                           ),
                                         ),
-                                        const SizedBox(height: 8),
-                                        if (rooms0.isEmpty)
-                                          const Padding(
-                                            padding: EdgeInsets.only(top: 8.0),
-                                            child: Text(
-                                              '방을 먼저 추가하세요.',
-                                              style: TextStyle(
-                                                color: Colors.white54,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
-                          );
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
                           ),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children:
-                                  filteredDevices.map((item) {
-                                    final device = item['device'] as Device;
-                                    final status = item['status'] as String;
-                                    final isOn = status == 'ON';
-                                    String roomName =
-                                        rooms0.firstWhere(
-                                          (r) => r['id'] == selectedRoomId,
-                                          orElse: () => {'name': '-'},
-                                        )['name'] ??
-                                        '-';
-                                    return GestureDetector(
-                                      onTap: () async {
-                                        await toggleDevice(device.id);
-                                        refreshRoomData();
-                                      },
+                        ),
+                      );
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children:
+                              filteredDevices.map((device) {
+                                final isOn = device.isActive == true;
+                                String roomName =
+                                    rooms0.firstWhere(
+                                      (r) => r['id'] == selectedRoomId,
+                                      orElse: () => {'name': '-'},
+                                    )['name'] ??
+                                    '-';
+                                final deviceProvider =
+                                    Provider.of<DeviceProvider>(context);
+                                final isLoading =
+                                    deviceProvider.deviceLoading[device.id] ==
+                                    true;
+                                return Stack(
+                                  children: [
+                                    GestureDetector(
+                                      onTap:
+                                          isLoading
+                                              ? null
+                                              : () async {
+                                                await Provider.of<
+                                                  DeviceProvider
+                                                >(
+                                                  context,
+                                                  listen: false,
+                                                ).toggleDevice(device.id);
+                                              },
                                       child: AnimatedOpacity(
                                         duration: Duration(milliseconds: 200),
                                         opacity: 1.0,
@@ -873,16 +833,36 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                           ),
                                         ),
                                       ),
-                                    );
-                                  }).toList(),
-                            ),
-                          ),
-                        );
-                      } else {
-                        return const SizedBox();
-                      }
-                    },
-                  ),
+                                    ),
+                                    if (isLoading)
+                                      Positioned.fill(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withOpacity(
+                                              0.3,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: const Center(
+                                            child: CircularProgressIndicator(
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    Colors.white,
+                                                  ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              }).toList(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 const SizedBox(height: 24),
               ],
             ),
