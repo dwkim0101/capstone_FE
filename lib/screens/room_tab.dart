@@ -6,6 +6,8 @@ import 'room_add_screen.dart';
 import '../models/room.dart';
 import '../utils/api_client.dart';
 import 'login_screen.dart';
+import 'dart:ui';
+import '../models/sensor.dart';
 
 Future<List<Room>?> fetchRoomList() async {
   print('[fetchRoomList] GET: \\${ApiConstants.roomList}');
@@ -56,101 +58,290 @@ class _RoomTabState extends State<RoomTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
     return Scaffold(
       backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('방 관리', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black.withOpacity(0.15),
         elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          '방 관리',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'room_fab',
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const RoomAddScreen()),
-          );
-          if (result == true) _fetchRooms();
-        },
-        child: const Icon(Icons.add),
-      ),
-      body: FutureBuilder<List<Room>?>(
-        future: fetchRoomList(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error, color: Colors.red, size: 48),
-                  const SizedBox(height: 16),
-                  Text(
-                    '방 목록을 불러올 수 없습니다.',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Color(0xFF3971FF),
-                    ),
-                    onPressed: _fetchRooms,
-                    child: const Text('다시 시도'),
-                  ),
-                ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+              child: _AddRoomButton(
+                onTap: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RoomAddScreen()),
+                  );
+                  if (result == true) _fetchRooms();
+                },
               ),
-            );
-          } else if (snapshot.hasData && snapshot.data != null) {
-            final rooms = snapshot.data!;
-            if (rooms.isEmpty) {
-              return const Center(
-                child: Text(
-                  '등록된 방이 없습니다.',
-                  style: TextStyle(color: Colors.white70),
-                ),
-              );
-            }
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: rooms.length,
-              itemBuilder: (context, i) {
-                final room = rooms[i];
-                return Card(
-                  color: Color(0xFF3971FF),
-                  child: ListTile(
-                    leading: const Icon(
-                      Icons.meeting_room,
-                      color: Colors.white,
-                    ),
-                    title: Text(
-                      room.name,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    onTap: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => RoomDetailScreen(room: room),
-                        ),
+            ),
+            Expanded(
+              child: FutureBuilder<List<Room>?>(
+                future: fetchRoomList(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return _StateMessage(
+                      icon: Icons.error_outline,
+                      text: '방 목록을 불러올 수 없습니다.',
+                      subText: '네트워크 상태를 확인해주세요.',
+                      color: Colors.redAccent,
+                      onRetry: _fetchRooms,
+                    );
+                  } else if (snapshot.hasData && snapshot.data != null) {
+                    final rooms = snapshot.data!;
+                    if (rooms.isEmpty) {
+                      return _StateMessage(
+                        icon: Icons.meeting_room_outlined,
+                        text: '등록된 방이 없습니다.',
+                        subText: '상단의 "+ 방 추가" 버튼을 눌러 방을 등록해보세요.',
+                        color: Colors.white70,
                       );
-                      if (result == true) _fetchRooms();
-                    },
-                  ),
-                );
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      child: GridView.count(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 18,
+                        childAspectRatio: 1.18,
+                        children:
+                            rooms
+                                .map(
+                                  (room) => _RoomCard(
+                                    room: room,
+                                    onTap: () async {
+                                      final result = await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) =>
+                                                  RoomDetailScreen(room: room),
+                                        ),
+                                      );
+                                      if (result == true) _fetchRooms();
+                                    },
+                                  ),
+                                )
+                                .toList(),
+                      ),
+                    );
+                  } else {
+                    return _StateMessage(
+                      icon: Icons.error_outline,
+                      text: '알 수 없는 오류',
+                      color: Colors.redAccent,
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AddRoomButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AddRoomButton({required this.onTap, super.key});
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 54,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF3971FF), Color(0xFF6A82FB)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add, color: Colors.white, size: 26),
+            SizedBox(width: 8),
+            Text(
+              '방 추가',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoomCard extends StatelessWidget {
+  final Room room;
+  final VoidCallback onTap;
+  const _RoomCard({required this.room, required this.onTap, super.key});
+
+  IconData get roomIcon {
+    final name = room.name;
+    if (name.contains('침실') || name.contains('방')) return Icons.bed;
+    if (name.contains('거실')) return Icons.weekend;
+    if (name.contains('주방')) return Icons.kitchen;
+    if (name.contains('욕실') || name.contains('화장실')) return Icons.bathtub;
+    if (name.contains('서재')) return Icons.menu_book;
+    if (name.contains('정원')) return Icons.park;
+    return Icons.meeting_room;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF3971FF), Color(0xFF6A82FB)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(roomIcon, color: Color(0xFF3971FF), size: 28),
+            ),
+            const SizedBox(height: 13),
+            Text(
+              room.name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 17,
+                letterSpacing: 0.5,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 7),
+            FutureBuilder<List<Sensor>?>(
+              future: fetchSensorList(room.id),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Text(
+                    '센서 ...',
+                    style: TextStyle(color: Colors.white38, fontSize: 13),
+                  );
+                } else if (snapshot.hasError) {
+                  return const Text(
+                    '센서 오류',
+                    style: TextStyle(color: Colors.redAccent, fontSize: 13),
+                  );
+                } else if (snapshot.hasData) {
+                  final sensors = snapshot.data ?? [];
+                  return Text(
+                    '센서 ${sensors.length}개',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  );
+                } else {
+                  return const Text(
+                    '센서 0개',
+                    style: TextStyle(color: Colors.white38, fontSize: 13),
+                  );
+                }
               },
-            );
-          } else {
-            return const Center(
-              child: Text('알 수 없는 오류', style: TextStyle(color: Colors.white)),
-            );
-          }
-        },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StateMessage extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final String? subText;
+  final Color color;
+  final VoidCallback? onRetry;
+  const _StateMessage({
+    required this.icon,
+    required this.text,
+    this.subText,
+    this.color = Colors.white70,
+    this.onRetry,
+    super.key,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 48),
+          const SizedBox(height: 16),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (subText != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              subText!,
+              style: TextStyle(color: Colors.white38, fontSize: 14),
+            ),
+          ],
+          if (onRetry != null) ...[
+            const SizedBox(height: 16),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Color(0xFF3971FF),
+              ),
+              onPressed: onRetry,
+              child: const Text('다시 시도'),
+            ),
+          ],
+        ],
       ),
     );
   }
