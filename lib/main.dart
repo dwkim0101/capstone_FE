@@ -3,10 +3,6 @@ import 'screens/login_screen.dart';
 import 'theme/smartair_theme.dart';
 import 'screens/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'utils/api_constants.dart';
-import 'utils/api_client.dart';
 
 void main() {
   runApp(const MyApp());

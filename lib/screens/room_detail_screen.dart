@@ -7,6 +7,7 @@ import 'sensor_add_screen.dart';
 import '../models/sensor.dart';
 import '../models/room.dart';
 import '../utils/api_client.dart';
+import 'device_register_screen.dart';
 
 Future<Room?> fetchRoomDetail(int roomId) async {
   final res = await authorizedRequest(
@@ -72,6 +73,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         elevation: 0,
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'add_sensor',
         onPressed: () async {
           final result = await Navigator.push(
             context,
@@ -82,6 +84,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           );
           if (result == true) _refresh();
         },
+        tooltip: '센서 추가',
         child: const Icon(Icons.add),
       ),
       body: FutureBuilder<List<Sensor>?>(

@@ -8,6 +8,7 @@ import 'device_detail_screen.dart' hide Device;
 import '../models/device.dart';
 import 'dart:ui';
 import 'login_screen.dart';
+import 'device_register_screen.dart';
 
 Future<List<Room>?> fetchRoomList() async {
   final res = await authorizedRequest('GET', Uri.parse(ApiConstants.roomList));
@@ -98,6 +99,7 @@ class _DeviceTabState extends State<DeviceTab>
   bool _loading = true;
   final List<Device> _devices = [];
   Future<List<Map<String, dynamic>>>? _deviceFutureWithStatus;
+  final Map<int, bool> _deviceLoading = {}; // deviceId -> loading
 
   @override
   void initState() {
@@ -322,7 +324,16 @@ class _DeviceTabState extends State<DeviceTab>
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'device_fab',
-        onPressed: _showAddDeviceDialog,
+        onPressed: () async {
+          if (_selectedRoomId == null) return;
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DeviceRegisterScreen(roomId: _selectedRoomId!),
+            ),
+          );
+          if (result == true) _fetchDevices();
+        },
         child: const Icon(Icons.add),
       ),
       body: Column(
@@ -587,86 +598,145 @@ class _DeviceTabState extends State<DeviceTab>
                                                                 ),
                                                     borderRadius:
                                                         BorderRadius.circular(
-                                                          16,
+                                                          20,
                                                         ),
+                                                    boxShadow: [
+                                                      if (isOn)
+                                                        BoxShadow(
+                                                          color: Color(
+                                                            0xFF3971FF,
+                                                          ).withOpacity(0.18),
+                                                          blurRadius: 16,
+                                                          offset: Offset(0, 6),
+                                                        ),
+                                                    ],
                                                   ),
-                                                  child: ListTile(
-                                                    leading: Container(
-                                                      width: 48,
-                                                      height: 48,
-                                                      decoration: BoxDecoration(
-                                                        color:
-                                                            isOn
-                                                                ? Color(
-                                                                  0xFF3971FF,
-                                                                )
-                                                                : Colors.white
-                                                                    .withOpacity(
-                                                                      0.18,
-                                                                    ),
-                                                        shape: BoxShape.circle,
+                                                  margin:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 2,
+                                                        horizontal: 2,
                                                       ),
-                                                      child: Icon(
-                                                        Icons.air,
-                                                        color:
-                                                            isOn
-                                                                ? Colors.white
-                                                                : Color(
-                                                                  0xFF3971FF,
-                                                                ),
-                                                        size: 28,
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 8,
+                                                        horizontal: 8,
                                                       ),
-                                                    ),
-                                                    title: Text(
-                                                      device.name,
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                    enabled: true,
-                                                    onTap: () async {
-                                                      final result = await Navigator.push(
-                                                        context,
-                                                        MaterialPageRoute(
-                                                          builder:
-                                                              (
-                                                                _,
-                                                              ) => DeviceDetailScreen(
-                                                                device: Device(
-                                                                  id: device.id,
-                                                                  name:
-                                                                      device
-                                                                          .name,
-                                                                  isActive:
-                                                                      isOn,
-                                                                  isRegistered:
-                                                                      device
-                                                                          .isRegistered,
-                                                                ),
-                                                              ),
+                                                  child: Row(
+                                                    children: [
+                                                      Container(
+                                                        width: 44,
+                                                        height: 44,
+                                                        decoration: BoxDecoration(
+                                                          color:
+                                                              isOn
+                                                                  ? Colors.white
+                                                                  : Colors
+                                                                      .white12,
+                                                          shape:
+                                                              BoxShape.circle,
                                                         ),
-                                                      );
-                                                      if (result == true)
-                                                        _fetchDevices();
-                                                    },
-                                                    trailing: Switch(
-                                                      value: isOn,
-                                                      onChanged: (_) async {
-                                                        await toggleDevice(
-                                                          device.id,
-                                                        );
-                                                        _fetchDevices();
-                                                      },
-                                                      activeColor: Color(
-                                                        0xFF3971FF,
+                                                        child: Icon(
+                                                          Icons.air,
+                                                          color:
+                                                              isOn
+                                                                  ? Color(
+                                                                    0xFF3971FF,
+                                                                  )
+                                                                  : Colors
+                                                                      .white54,
+                                                          size: 28,
+                                                        ),
                                                       ),
-                                                      inactiveThumbColor:
-                                                          Colors.white54,
-                                                      inactiveTrackColor:
-                                                          Colors.white24,
-                                                    ),
+                                                      const SizedBox(width: 16),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              device.name,
+                                                              style: TextStyle(
+                                                                color:
+                                                                    Colors
+                                                                        .white,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                fontSize: 16,
+                                                              ),
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 4,
+                                                            ),
+                                                            Text(
+                                                              isOn
+                                                                  ? '켜짐'
+                                                                  : '꺼짐',
+                                                              style: TextStyle(
+                                                                color:
+                                                                    isOn
+                                                                        ? Colors
+                                                                            .white
+                                                                        : Colors
+                                                                            .white54,
+                                                                fontSize: 13,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 12),
+                                                      _deviceLoading[device
+                                                                  .id] ==
+                                                              true
+                                                          ? SizedBox(
+                                                            width: 32,
+                                                            height: 32,
+                                                            child: CircularProgressIndicator(
+                                                              strokeWidth: 3,
+                                                              valueColor:
+                                                                  AlwaysStoppedAnimation<
+                                                                    Color
+                                                                  >(
+                                                                    Colors
+                                                                        .white,
+                                                                  ),
+                                                            ),
+                                                          )
+                                                          : Switch(
+                                                            value: isOn,
+                                                            onChanged: (
+                                                              _,
+                                                            ) async {
+                                                              setState(() {
+                                                                _deviceLoading[device
+                                                                        .id] =
+                                                                    true;
+                                                              });
+                                                              await toggleDevice(
+                                                                device.id,
+                                                              );
+                                                              await _fetchDevices();
+                                                              setState(() {
+                                                                _deviceLoading[device
+                                                                        .id] =
+                                                                    false;
+                                                              });
+                                                            },
+                                                            activeColor: Color(
+                                                              0xFF3971FF,
+                                                            ),
+                                                            inactiveThumbColor:
+                                                                Colors.white54,
+                                                            inactiveTrackColor:
+                                                                Colors.white24,
+                                                          ),
+                                                    ],
                                                   ),
                                                 );
                                               },

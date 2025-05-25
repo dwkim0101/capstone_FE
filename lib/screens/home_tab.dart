@@ -9,6 +9,7 @@ import '../theme/smartair_theme.dart';
 import '../models/device.dart';
 import 'device_detail_screen.dart';
 import 'dart:async';
+import 'package:animated_flip_counter/animated_flip_counter.dart';
 
 class Score {
   final int value;
@@ -118,7 +119,8 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
   int? selectedRoomId;
   Map<String, dynamic>? user;
   late AnimationController controller0;
-  Future<Score>? scoreFuture;
+  int? _scoreValue;
+  String? _scoreStatus;
   Future<List<Map<String, dynamic>>>? deviceFutureWithStatus;
   late Timer scoreUpdateTimer;
 
@@ -134,11 +136,25 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
     // 점수 실시간 갱신 타이머
     scoreUpdateTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (selectedRoomId != null) {
-        setState(() {
-          scoreFuture = fetchRoomScore(selectedRoomId!);
-        });
+        fetchAndSetScore();
       }
     });
+  }
+
+  void fetchAndSetScore() async {
+    if (selectedRoomId == null) return;
+    try {
+      final score = await fetchRoomScore(selectedRoomId!);
+      setState(() {
+        _scoreValue = score.value;
+        _scoreStatus = score.status;
+      });
+    } catch (_) {
+      setState(() {
+        _scoreValue = null;
+        _scoreStatus = null;
+      });
+    }
   }
 
   Future<void> fetchRoomsAndInit() async {
@@ -175,7 +191,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
 
   void refreshRoomData() {
     if (selectedRoomId == null) return;
-    scoreFuture = fetchRoomScore(selectedRoomId!);
+    fetchAndSetScore();
     deviceFutureWithStatus = fetchDeviceListWithStatus(selectedRoomId!);
   }
 
@@ -399,39 +415,32 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
           // Container(color: Colors.black),
           // 공기 점수 뒤 애니메이션 원
           if (controller0.isAnimating)
-            FutureBuilder<Score>(
-              future: scoreFuture,
-              builder: (context, snapshot) {
-                final color =
-                    (snapshot.hasData)
-                        ? scoreColor(snapshot.data!.value)
-                        : Colors.white;
-                return Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Container(color: Colors.black),
-                      AnimatedBuilder(
-                        animation: controller0,
-                        builder: (context, child) {
-                          return CustomPaint(
-                            size: MediaQuery.of(context).size,
-                            painter: _CircleGradientPainterDark(
-                              progress: controller0.value,
-                              gradientColors: [color, color],
-                            ),
-                          );
-                        },
-                      ),
-                      // Container(color: Colors.black),
-                      BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                        child: Container(color: Colors.transparent),
-                      ),
-                    ],
+            Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  AnimatedBuilder(
+                    animation: controller0,
+                    builder: (context, child) {
+                      final color =
+                          (_scoreValue != null)
+                              ? scoreColor(_scoreValue!)
+                              : Colors.white;
+                      return CustomPaint(
+                        size: MediaQuery.of(context).size,
+                        painter: _CircleGradientPainterDark(
+                          progress: controller0.value,
+                          gradientColors: [color, color],
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
+                  BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                    child: Container(color: Colors.transparent),
+                  ),
+                ],
+              ),
             ),
           // 공기 점수 (화면 정중앙)
           Center(
@@ -443,86 +452,72 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                   style: TextStyle(fontSize: 14, color: Colors.white),
                 ),
                 const SizedBox(height: 8),
-                if (scoreFuture != null)
-                  FutureBuilder<Score>(
-                    future: scoreFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const CircularProgressIndicator();
-                      } else if (snapshot.hasError) {
-                        if (snapshot.error == 'NO_SCORE_DATA') {
-                          return const Text(
-                            '점수 데이터 없음',
-                            style: TextStyle(color: Colors.white70),
-                          );
-                        }
-                        return Text('점수 오류: \\${snapshot.error}');
-                      } else if (snapshot.hasData) {
-                        final score = snapshot.data!;
-                        return Column(
-                          children: [
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 600),
-                              transitionBuilder:
-                                  (child, animation) => ScaleTransition(
-                                    scale: animation,
-                                    child: child,
-                                  ),
-                              child: Text(
-                                score.value.toString(),
-                                key: ValueKey(score.value),
-                                style: TextStyle(
-                                  fontSize: 54,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  letterSpacing: 1.5,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withOpacity(0.5),
-                                      blurRadius: 8,
-                                      offset: Offset(0, 2),
-                                    ),
-                                    Shadow(
-                                      color: scoreColor(
-                                        score.value,
-                                      ).withOpacity(0.4),
-                                      blurRadius: 18,
-                                      offset: Offset(0, 0),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                if (_scoreValue == null)
+                  const Text(
+                    '점수 데이터 없음',
+                    style: TextStyle(color: Colors.white70),
+                  )
+                else
+                  Column(
+                    children: [
+                      AnimatedFlipCounter(
+                        duration: const Duration(milliseconds: 700),
+                        value: _scoreValue ?? 0,
+                        textStyle: TextStyle(
+                          fontSize: 54,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: 1.5,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
                             ),
-                            SizedBox(height: 10),
-                            Text(
-                              score.status,
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: statusColor(score.status),
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 1.2,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black.withOpacity(0.4),
-                                    blurRadius: 6,
-                                    offset: Offset(0, 1),
-                                  ),
-                                  Shadow(
-                                    color: scoreColor(
-                                      score.value,
-                                    ).withOpacity(0.3),
-                                    blurRadius: 12,
-                                    offset: Offset(0, 0),
-                                  ),
-                                ],
-                              ),
+                            Shadow(
+                              color: scoreColor(
+                                _scoreValue ?? 0,
+                              ).withOpacity(0.4),
+                              blurRadius: 18,
+                              offset: Offset(0, 0),
                             ),
                           ],
-                        );
-                      } else {
-                        return const SizedBox();
-                      }
-                    },
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 400),
+                        transitionBuilder:
+                            (child, animation) => FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            ),
+                        child: Text(
+                          _scoreStatus ?? '',
+                          key: ValueKey(_scoreStatus),
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: statusColor(_scoreStatus ?? ''),
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.2,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withOpacity(0.4),
+                                blurRadius: 6,
+                                offset: Offset(0, 1),
+                              ),
+                              Shadow(
+                                color: scoreColor(
+                                  _scoreValue ?? 0,
+                                ).withOpacity(0.3),
+                                blurRadius: 12,
+                                offset: Offset(0, 0),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -773,119 +768,113 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                             horizontal: 16,
                             vertical: 8,
                           ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.08),
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.12),
-                                  ),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 20,
-                                  horizontal: 12,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children:
-                                      filteredDevices.map((item) {
-                                        final device = item['device'] as Device;
-                                        final status = item['status'] as String;
-                                        final isOn = status == 'ON';
-                                        return Column(
-                                          children: [
-                                            Container(
-                                              decoration: BoxDecoration(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children:
+                                  filteredDevices.map((item) {
+                                    final device = item['device'] as Device;
+                                    final status = item['status'] as String;
+                                    final isOn = status == 'ON';
+                                    String roomName =
+                                        rooms0.firstWhere(
+                                          (r) => r['id'] == selectedRoomId,
+                                          orElse: () => {'name': '-'},
+                                        )['name'] ??
+                                        '-';
+                                    return GestureDetector(
+                                      onTap: () async {
+                                        await toggleDevice(device.id);
+                                        refreshRoomData();
+                                      },
+                                      child: AnimatedOpacity(
+                                        duration: Duration(milliseconds: 200),
+                                        opacity: 1.0,
+                                        child: Container(
+                                          width: 120,
+                                          margin: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 8,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 18,
+                                            horizontal: 10,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                isOn
+                                                    ? Color(0xFF3971FF)
+                                                    : Colors.grey[900],
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
                                                 color:
                                                     isOn
-                                                        ? Color(0xFF3971FF)
-                                                        : Colors.white
-                                                            .withOpacity(0.10),
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
+                                                        ? Color(
+                                                          0xFF3971FF,
+                                                        ).withOpacity(0.18)
+                                                        : Colors.black
+                                                            .withOpacity(0.12),
+                                                blurRadius: 16,
+                                                offset: Offset(0, 6),
                                               ),
-                                              child: ListTile(
-                                                leading: Container(
-                                                  width: 48,
-                                                  height: 48,
-                                                  decoration: BoxDecoration(
-                                                    color:
-                                                        isOn
-                                                            ? Color(0xFF3971FF)
-                                                            : Colors.white
-                                                                .withOpacity(
-                                                                  0.18,
-                                                                ),
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.air,
-                                                    color:
-                                                        isOn
-                                                            ? Colors.white
-                                                            : Color(0xFF3971FF),
-                                                    size: 28,
-                                                  ),
+                                            ],
+                                          ),
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Container(
+                                                width: 48,
+                                                height: 48,
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      isOn
+                                                          ? Colors.white
+                                                          : Colors.white12,
+                                                  shape: BoxShape.circle,
                                                 ),
-                                                title: Text(
-                                                  device.name,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                                enabled: true,
-                                                onTap: () async {
-                                                  final result = await Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder:
-                                                          (
-                                                            _,
-                                                          ) => DeviceDetailScreen(
-                                                            device: Device(
-                                                              id: device.id,
-                                                              name: device.name,
-                                                              isActive: isOn,
-                                                              isRegistered:
-                                                                  device
-                                                                      .isRegistered,
-                                                            ),
-                                                          ),
-                                                    ),
-                                                  );
-                                                  if (result == true)
-                                                    refreshRoomData();
-                                                },
-                                                trailing: Switch(
-                                                  value: isOn,
-                                                  onChanged: (_) async {
-                                                    await toggleDevice(
-                                                      device.id,
-                                                    );
-                                                    refreshRoomData();
-                                                  },
-                                                  activeColor: Color(
-                                                    0xFF3971FF,
-                                                  ),
-                                                  inactiveThumbColor:
-                                                      Colors.white54,
-                                                  inactiveTrackColor:
-                                                      Colors.white24,
+                                                child: Icon(
+                                                  Icons
+                                                      .air, // 또는 Icons.power_settings_new
+                                                  color:
+                                                      isOn
+                                                          ? Color(0xFF3971FF)
+                                                          : Colors.white54,
+                                                  size: 32,
                                                 ),
                                               ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                          ],
-                                        );
-                                      }).toList(),
-                                ),
-                              ),
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                device.name,
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                isOn ? '켜짐' : '꺼짐',
+                                                style: TextStyle(
+                                                  color:
+                                                      isOn
+                                                          ? Colors.white
+                                                          : Colors.white54,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
                             ),
                           ),
                         );
