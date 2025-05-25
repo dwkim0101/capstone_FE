@@ -82,7 +82,10 @@ Future<String> fetchDevicePowerStatus(int deviceId) async {
 Future<List<Map<String, dynamic>>> fetchDeviceListWithStatus(int roomId) async {
   final devices = await fetchDeviceList(roomId);
   final List<Map<String, dynamic>> result = [];
-  for (final device in devices) {
+  // isRegistered==true인 기기만 상태조회
+  final registeredDevices =
+      devices.where((d) => d.isRegistered == true).toList();
+  for (final device in registeredDevices) {
     final status = await fetchDevicePowerStatus(device.id);
     result.add({'device': device, 'status': status});
   }
@@ -458,27 +461,36 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                         final score = snapshot.data!;
                         return Column(
                           children: [
-                            Text(
-                              score.value.toString(),
-                              style: TextStyle(
-                                fontSize: 54,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 1.5,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black.withOpacity(0.5),
-                                    blurRadius: 8,
-                                    offset: Offset(0, 2),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 600),
+                              transitionBuilder:
+                                  (child, animation) => ScaleTransition(
+                                    scale: animation,
+                                    child: child,
                                   ),
-                                  Shadow(
-                                    color: _scoreColor(
-                                      score.value,
-                                    ).withOpacity(0.4),
-                                    blurRadius: 18,
-                                    offset: Offset(0, 0),
-                                  ),
-                                ],
+                              child: Text(
+                                score.value.toString(),
+                                key: ValueKey(score.value),
+                                style: TextStyle(
+                                  fontSize: 54,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: 1.5,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withOpacity(0.5),
+                                      blurRadius: 8,
+                                      offset: Offset(0, 2),
+                                    ),
+                                    Shadow(
+                                      color: _scoreColor(
+                                        score.value,
+                                      ).withOpacity(0.4),
+                                      blurRadius: 18,
+                                      offset: Offset(0, 0),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                             SizedBox(height: 10),
@@ -637,7 +649,15 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                     future: _deviceFutureWithStatus,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return const Center(
+                          child: Text(
+                            '조회중 ...',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                            ),
+                          ),
+                        );
                       } else if (snapshot.hasError) {
                         final error = snapshot.error.toString();
                         if (error.contains('403')) {
@@ -675,6 +695,79 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                         return Text('기기 오류: $error');
                       } else if (snapshot.hasData) {
                         final devices = snapshot.data!;
+                        final filteredDevices =
+                            devices
+                                .where(
+                                  (item) =>
+                                      (item['device'] as Device).isRegistered ==
+                                      true,
+                                )
+                                .toList();
+                        if (devices.isEmpty || filteredDevices.isEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: 12,
+                                  sigmaY: 12,
+                                ),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.12),
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 20,
+                                    horizontal: 12,
+                                  ),
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const SizedBox(height: 8),
+                                        Icon(
+                                          Icons.devices_other,
+                                          color: Colors.white38,
+                                          size: 40,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                          '기기를 추가해주세요.',
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        if (_rooms.isEmpty)
+                                          const Padding(
+                                            padding: EdgeInsets.only(top: 8.0),
+                                            child: Text(
+                                              '방을 먼저 추가하세요.',
+                                              style: TextStyle(
+                                                color: Colors.white54,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }
                         return Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -696,183 +789,102 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                   vertical: 20,
                                   horizontal: 12,
                                 ),
-                                child:
-                                    devices.isEmpty
-                                        ? SizedBox(
-                                          width: double.infinity,
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              const SizedBox(height: 8),
-                                              Icon(
-                                                Icons.devices_other,
-                                                color: Colors.white38,
-                                                size: 40,
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children:
+                                      filteredDevices.map((item) {
+                                        final device = item['device'] as Device;
+                                        final status = item['status'] as String;
+                                        final isOn = status == 'ON';
+                                        return Column(
+                                          children: [
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color:
+                                                    isOn
+                                                        ? Color(0xFF3971FF)
+                                                        : Colors.white
+                                                            .withOpacity(0.10),
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
                                               ),
-                                              const SizedBox(height: 12),
-                                              const Text(
-                                                '기기를 추가해주세요.',
-                                                style: TextStyle(
-                                                  color: Colors.white70,
-                                                  fontSize: 16,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 8),
-                                              if (_rooms.isEmpty)
-                                                const Padding(
-                                                  padding: EdgeInsets.only(
-                                                    top: 8.0,
+                                              child: ListTile(
+                                                leading: Container(
+                                                  width: 48,
+                                                  height: 48,
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        isOn
+                                                            ? Color(0xFF3971FF)
+                                                            : Colors.white
+                                                                .withOpacity(
+                                                                  0.18,
+                                                                ),
+                                                    shape: BoxShape.circle,
                                                   ),
-                                                  child: Text(
-                                                    '방을 먼저 추가하세요.',
-                                                    style: TextStyle(
-                                                      color: Colors.white54,
-                                                      fontSize: 13,
+                                                  child: Icon(
+                                                    Icons.air,
+                                                    color:
+                                                        isOn
+                                                            ? Colors.white
+                                                            : Color(0xFF3971FF),
+                                                    size: 28,
+                                                  ),
+                                                ),
+                                                title: Text(
+                                                  device.name,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                enabled: true,
+                                                onTap: () async {
+                                                  final result = await Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder:
+                                                          (
+                                                            _,
+                                                          ) => DeviceDetailScreen(
+                                                            device: Device(
+                                                              id: device.id,
+                                                              name: device.name,
+                                                              isActive: isOn,
+                                                              isRegistered:
+                                                                  device
+                                                                      .isRegistered,
+                                                            ),
+                                                          ),
                                                     ),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        )
-                                        : Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceEvenly,
-                                          children:
-                                              devices
-                                                  .where(
-                                                    (item) =>
-                                                        (item['device']
-                                                                as Device)
-                                                            .isRegistered ==
-                                                        true,
-                                                  )
-                                                  .map((item) {
-                                                    final device =
-                                                        item['device']
-                                                            as Device;
-                                                    final status =
-                                                        item['status']
-                                                            as String;
-                                                    final isOn = status == 'ON';
-                                                    return Column(
-                                                      children: [
-                                                        Container(
-                                                          decoration: BoxDecoration(
-                                                            color:
-                                                                isOn
-                                                                    ? Color(
-                                                                      0xFF3971FF,
-                                                                    )
-                                                                    : Colors
-                                                                        .white
-                                                                        .withOpacity(
-                                                                          0.10,
-                                                                        ),
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  16,
-                                                                ),
-                                                          ),
-                                                          child: ListTile(
-                                                            leading: Container(
-                                                              width: 48,
-                                                              height: 48,
-                                                              decoration: BoxDecoration(
-                                                                color:
-                                                                    isOn
-                                                                        ? Color(
-                                                                          0xFF3971FF,
-                                                                        )
-                                                                        : Colors
-                                                                            .white
-                                                                            .withOpacity(
-                                                                              0.18,
-                                                                            ),
-                                                                shape:
-                                                                    BoxShape
-                                                                        .circle,
-                                                              ),
-                                                              child: Icon(
-                                                                Icons.air,
-                                                                color:
-                                                                    isOn
-                                                                        ? Colors
-                                                                            .white
-                                                                        : Color(
-                                                                          0xFF3971FF,
-                                                                        ),
-                                                                size: 28,
-                                                              ),
-                                                            ),
-                                                            title: Text(
-                                                              device.name,
-                                                              style: const TextStyle(
-                                                                color:
-                                                                    Colors
-                                                                        .white,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600,
-                                                              ),
-                                                            ),
-                                                            enabled: true,
-                                                            onTap: () async {
-                                                              final result = await Navigator.push(
-                                                                context,
-                                                                MaterialPageRoute(
-                                                                  builder:
-                                                                      (
-                                                                        _,
-                                                                      ) => DeviceDetailScreen(
-                                                                        device: Device(
-                                                                          id:
-                                                                              device.id,
-                                                                          name:
-                                                                              device.name,
-                                                                          isActive:
-                                                                              isOn,
-                                                                          isRegistered:
-                                                                              device.isRegistered,
-                                                                        ),
-                                                                      ),
-                                                                ),
-                                                              );
-                                                              if (result ==
-                                                                  true)
-                                                                _refreshRoomData();
-                                                            },
-                                                            trailing: Switch(
-                                                              value: isOn,
-                                                              onChanged: (
-                                                                _,
-                                                              ) async {
-                                                                await toggleDevice(
-                                                                  device.id,
-                                                                );
-                                                                _refreshRoomData();
-                                                              },
-                                                              activeColor:
-                                                                  Color(
-                                                                    0xFF3971FF,
-                                                                  ),
-                                                              inactiveThumbColor:
-                                                                  Colors
-                                                                      .white54,
-                                                              inactiveTrackColor:
-                                                                  Colors
-                                                                      .white24,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                          height: 8,
-                                                        ),
-                                                      ],
+                                                  );
+                                                  if (result == true)
+                                                    _refreshRoomData();
+                                                },
+                                                trailing: Switch(
+                                                  value: isOn,
+                                                  onChanged: (_) async {
+                                                    await toggleDevice(
+                                                      device.id,
                                                     );
-                                                  })
-                                                  .toList(),
-                                        ),
+                                                    _refreshRoomData();
+                                                  },
+                                                  activeColor: Color(
+                                                    0xFF3971FF,
+                                                  ),
+                                                  inactiveThumbColor:
+                                                      Colors.white54,
+                                                  inactiveTrackColor:
+                                                      Colors.white24,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                          ],
+                                        );
+                                      }).toList(),
+                                ),
                               ),
                             ),
                           ),
