@@ -81,25 +81,27 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error, color: Colors.red, size: 48),
-                  const SizedBox(height: 16),
-                  Text(
-                    '센서 목록을 불러올 수 없습니다.',
-                    style: TextStyle(color: Colors.black),
+              child: Card(
+                margin: const EdgeInsets.all(24),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error, color: Colors.red, size: 48),
+                      const SizedBox(height: 16),
+                      Text(
+                        '센서 목록을 불러올 수 없습니다.',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: _refresh,
+                        child: const Text('다시 시도'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Colors.blue,
-                    ),
-                    onPressed: _refresh,
-                    child: const Text('다시 시도'),
-                  ),
-                ],
+                ),
               ),
             );
           } else if (snapshot.hasData) {
@@ -107,30 +109,46 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
             if (sensors.isEmpty) {
               return const Center(child: Text('등록된 센서가 없습니다.'));
             }
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: sensors.length,
-              itemBuilder: (context, i) {
-                final sensor = sensors[i];
-                return Card(
-                  color: Colors.blue,
-                  child: ListTile(
-                    leading: const Icon(Icons.sensors, color: Colors.white),
-                    title: Text(
-                      sensor.name,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SensorDetailScreen(sensor: sensor),
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.room.name,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '센서 목록',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      ...sensors.map(
+                        (sensor) => ListTile(
+                          leading: const Icon(Icons.sensors),
+                          title: Text(
+                            sensor.name,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (_) => SensorDetailScreen(sensor: sensor),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
+                      ),
+                    ],
                   ),
-                );
-              },
+                ),
+              ),
             );
           } else {
             return const Center(child: Text('알 수 없는 오류'));

@@ -33,6 +33,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: SmartAirBottomNavBar(
         currentIndex: _selectedIndex,

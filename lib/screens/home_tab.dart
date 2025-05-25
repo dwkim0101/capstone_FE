@@ -73,6 +73,32 @@ Future<List<Device>> fetchDeviceList(int roomId) async {
   }
 }
 
+Future<String> fetchDevicePowerStatus(int deviceId) async {
+  final res = await authorizedRequest(
+    'GET',
+    Uri.parse('${ApiConstants.baseUrl}/thinq/status/$deviceId'),
+  );
+  if (res.statusCode == 200) {
+    final data = json.decode(res.body);
+    final op = data['response']?['operation']?['airFanOperationMode'];
+    if (op == 'POWER_ON') return 'ON';
+    if (op == 'POWER_OFF') return 'OFF';
+    return 'UNKNOWN';
+  } else {
+    return 'UNKNOWN';
+  }
+}
+
+Future<List<Map<String, dynamic>>> fetchDeviceListWithStatus(int roomId) async {
+  final devices = await fetchDeviceList(roomId);
+  final List<Map<String, dynamic>> result = [];
+  for (final device in devices) {
+    final status = await fetchDevicePowerStatus(device.deviceId);
+    result.add({'device': device, 'status': status});
+  }
+  return result;
+}
+
 Future<void> toggleDevice(int deviceId) async {
   try {
     final res = await authorizedRequest(
@@ -100,14 +126,14 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
   Map<String, dynamic>? _user;
   late AnimationController _controller;
   Future<Score>? _scoreFuture;
-  Future<List<Device>>? _deviceFuture;
+  Future<List<Map<String, dynamic>>>? _deviceFutureWithStatus;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
     _fetchRoomsAndInit();
     _fetchUser();
@@ -148,7 +174,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
   void _refreshRoomData() {
     if (_selectedRoomId == null) return;
     _scoreFuture = fetchRoomScore(_selectedRoomId!);
-    _deviceFuture = fetchDeviceList(_selectedRoomId!);
+    _deviceFutureWithStatus = fetchDeviceListWithStatus(_selectedRoomId!);
   }
 
   Future<void> _fetchUser() async {
@@ -190,12 +216,71 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
     }
   }
 
+  Future<void> _showAddDeviceDialog() async {
+    if (_selectedRoomId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('방을 먼저 추가하세요.')));
+      return;
+    }
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('기기 추가'),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(hintText: '기기명 입력'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, controller.text),
+                child: const Text('추가'),
+              ),
+            ],
+          ),
+    );
+    if (result != null && result.trim().isNotEmpty) {
+      final res = await authorizedRequest(
+        'POST',
+        Uri.parse('${ApiConstants.apiBase}/device/add'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'name': result.trim(), 'roomId': _selectedRoomId}),
+      );
+      if (res.statusCode != 200) {
+        String msg = '기기 추가 실패';
+        try {
+          final data = json.decode(res.body);
+          if (data is Map && data['message'] != null) {
+            msg = data['message'].toString();
+          }
+        } catch (_) {}
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
+      } else {
+        setState(() {
+          _refreshRoomData();
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('기기 추가 완료')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
+          Container(color: Colors.black),
           // 배경 그라데이션
           Container(
             decoration: const BoxDecoration(
@@ -206,6 +291,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
               ),
             ),
           ),
+          // Container(color: Colors.black),
           // 공기 점수 뒤 애니메이션 원
           if (_controller.isAnimating)
             FutureBuilder<Score>(
@@ -219,6 +305,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
+                      // Container(color: Colors.black),
                       AnimatedBuilder(
                         animation: _controller,
                         builder: (context, child) {
@@ -231,8 +318,9 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                           );
                         },
                       ),
+                      // Container(color: Colors.black),
                       BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                         child: Container(color: Colors.transparent),
                       ),
                     ],
@@ -297,6 +385,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
           ),
           // UI
           SafeArea(
+            // bottom: false,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -408,12 +497,11 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                     ),
                   ),
                 ),
-                // const SizedBox(height: 24),
                 Spacer(),
                 // 기기 카드
-                if (_deviceFuture != null)
-                  FutureBuilder<List<Device>>(
-                    future: _deviceFuture,
+                if (_deviceFutureWithStatus != null)
+                  FutureBuilder<List<Map<String, dynamic>>>(
+                    future: _deviceFutureWithStatus,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
@@ -421,42 +509,175 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                         return Text('기기 오류: \\${snapshot.error}');
                       } else if (snapshot.hasData) {
                         final devices = snapshot.data!;
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children:
-                              devices.map((device) {
-                                return GestureDetector(
-                                  onTap: () async {
-                                    try {
-                                      await toggleDevice(device.deviceId);
-                                      _refreshRoomData();
-                                    } catch (e) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(content: Text('기기 제어 실패: $e')),
-                                      );
-                                    }
-                                  },
-                                  child: Card(
-                                    color: Colors.black.withOpacity(0.2),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(16.0),
-                                      child: Column(
-                                        children: [
-                                          Icon(Icons.air, color: Colors.white),
-                                          Text(
-                                            device.alias,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.12),
                                   ),
-                                );
-                              }).toList(),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 20,
+                                  horizontal: 12,
+                                ),
+                                child:
+                                    devices.isEmpty
+                                        ? SizedBox(
+                                          width: double.infinity,
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              const SizedBox(height: 8),
+                                              Icon(
+                                                Icons.devices_other,
+                                                color: Colors.white38,
+                                                size: 40,
+                                              ),
+                                              const SizedBox(height: 12),
+                                              const Text(
+                                                '기기가 없습니다.',
+                                                style: TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              if (_rooms.isEmpty)
+                                                const Padding(
+                                                  padding: EdgeInsets.only(
+                                                    top: 8.0,
+                                                  ),
+                                                  child: Text(
+                                                    '방을 먼저 추가하세요.',
+                                                    style: TextStyle(
+                                                      color: Colors.white54,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        )
+                                        : Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceEvenly,
+                                          children:
+                                              devices.map((item) {
+                                                final device =
+                                                    item['device'] as Device;
+                                                final status =
+                                                    item['status'] as String;
+                                                final isOn = status == 'ON';
+                                                return Column(
+                                                  children: [
+                                                    Container(
+                                                      width: 54,
+                                                      height: 54,
+                                                      decoration: BoxDecoration(
+                                                        color:
+                                                            isOn
+                                                                ? Color(
+                                                                  0xFF3971FF,
+                                                                )
+                                                                : Colors.white
+                                                                    .withOpacity(
+                                                                      0.18,
+                                                                    ),
+                                                        shape: BoxShape.circle,
+                                                        boxShadow: [
+                                                          if (isOn)
+                                                            BoxShadow(
+                                                              color: Color(
+                                                                0xFF3971FF,
+                                                              ).withOpacity(
+                                                                0.3,
+                                                              ),
+                                                              blurRadius: 12,
+                                                              offset: Offset(
+                                                                0,
+                                                                4,
+                                                              ),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                      child: IconButton(
+                                                        icon: Icon(
+                                                          Icons.air,
+                                                          color:
+                                                              isOn
+                                                                  ? Colors.white
+                                                                  : Color(
+                                                                    0xFF3971FF,
+                                                                  ),
+                                                          size: 28,
+                                                        ),
+                                                        onPressed: () async {
+                                                          try {
+                                                            await toggleDevice(
+                                                              device.deviceId,
+                                                            );
+                                                            _refreshRoomData();
+                                                          } catch (e) {
+                                                            ScaffoldMessenger.of(
+                                                              context,
+                                                            ).showSnackBar(
+                                                              SnackBar(
+                                                                content: Text(
+                                                                  '기기 제어 실패: $e',
+                                                                ),
+                                                              ),
+                                                            );
+                                                          }
+                                                        },
+                                                        splashRadius: 28,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    Text(
+                                                      device.alias,
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        fontSize: 13,
+                                                      ),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      isOn ? '켜짐' : '꺼짐',
+                                                      style: TextStyle(
+                                                        color:
+                                                            isOn
+                                                                ? Color(
+                                                                  0xFF3971FF,
+                                                                )
+                                                                : Colors
+                                                                    .white70,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              }).toList(),
+                                        ),
+                              ),
+                            ),
+                          ),
                         );
                       } else {
                         return const SizedBox();

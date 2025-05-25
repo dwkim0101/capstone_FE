@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/room.dart';
 import '../utils/api_client.dart';
+import 'device_detail_screen.dart' hide Device;
+import '../models/device.dart';
+import 'dart:ui';
 
 Future<List<Room>> fetchRoomList() async {
   final res = await authorizedRequest('GET', Uri.parse(ApiConstants.roomList));
@@ -13,19 +16,6 @@ Future<List<Room>> fetchRoomList() async {
   } else {
     throw Exception('방 목록 불러오기 실패');
   }
-}
-
-class Device {
-  final int deviceId;
-  final String alias;
-  Device({required this.deviceId, required this.alias});
-  factory Device.fromJson(Map<String, dynamic> json) => Device(
-    deviceId:
-        json['deviceId'] is int
-            ? json['deviceId']
-            : int.tryParse(json['deviceId'].toString()) ?? 0,
-    alias: json['alias'] ?? '',
-  );
 }
 
 Future<List<Device>> fetchDeviceList(int roomId) async {
@@ -55,6 +45,32 @@ Future<void> toggleDevice(int deviceId) async {
   }
 }
 
+Future<String> fetchDevicePowerStatus(int deviceId) async {
+  final res = await authorizedRequest(
+    'GET',
+    Uri.parse('${ApiConstants.baseUrl}/thinq/status/$deviceId'),
+  );
+  if (res.statusCode == 200) {
+    final data = json.decode(res.body);
+    final op = data['response']?['operation']?['airFanOperationMode'];
+    if (op == 'POWER_ON') return 'ON';
+    if (op == 'POWER_OFF') return 'OFF';
+    return 'UNKNOWN';
+  } else {
+    return 'UNKNOWN';
+  }
+}
+
+Future<List<Map<String, dynamic>>> fetchDeviceListWithStatus(int roomId) async {
+  final devices = await fetchDeviceList(roomId);
+  final List<Map<String, dynamic>> result = [];
+  for (final device in devices) {
+    final status = await fetchDevicePowerStatus(device.id);
+    result.add({'device': device, 'status': status});
+  }
+  return result;
+}
+
 class DeviceTab extends StatefulWidget {
   const DeviceTab({super.key});
   @override
@@ -66,7 +82,8 @@ class _DeviceTabState extends State<DeviceTab>
   List<dynamic> _rooms = [];
   int? _selectedRoomId;
   bool _loading = true;
-  List<Device> _devices = [];
+  final List<Device> _devices = [];
+  Future<List<Map<String, dynamic>>>? _deviceFutureWithStatus;
 
   @override
   void initState() {
@@ -104,16 +121,9 @@ class _DeviceTabState extends State<DeviceTab>
 
   Future<void> _fetchDevices() async {
     if (_selectedRoomId == null) return;
-    final res = await authorizedRequest(
-      'GET',
-      Uri.parse(ApiConstants.deviceList(_selectedRoomId!)),
-    );
-    if (res.statusCode == 200) {
-      final List data = json.decode(res.body);
-      setState(() {
-        _devices = data.map((e) => Device.fromJson(e)).toList();
-      });
-    }
+    setState(() {
+      _deviceFutureWithStatus = fetchDeviceListWithStatus(_selectedRoomId!);
+    });
   }
 
   void _onRoomSelected(int? roomId) {
@@ -198,7 +208,7 @@ class _DeviceTabState extends State<DeviceTab>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '현재 방: \\${_rooms.firstWhere((r) => r['id'] == _selectedRoomId, orElse: () => null)?['name'] ?? '-'}',
+                    '현재 방: ${_rooms.firstWhere((r) => r['id'] == _selectedRoomId, orElse: () => null)?['name'] ?? '-'}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -266,25 +276,214 @@ class _DeviceTabState extends State<DeviceTab>
                 style: TextStyle(color: Colors.white70, fontSize: 16),
               ),
             ),
-          if (_selectedRoomId != null && _devices.isNotEmpty)
+          if (_selectedRoomId != null)
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _devices.length,
-                itemBuilder: (context, i) {
-                  final device = _devices[i];
-                  return Card(
-                    color: Colors.blue,
-                    child: ListTile(
-                      leading: const Icon(Icons.air, color: Colors.white),
-                      title: Text(
-                        device.alias,
-                        style: const TextStyle(color: Colors.white),
+              child:
+                  _deviceFutureWithStatus == null
+                      ? const Center(child: CircularProgressIndicator())
+                      : FutureBuilder<List<Map<String, dynamic>>>(
+                        future: _deviceFutureWithStatus,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          } else if (snapshot.hasError) {
+                            return Center(
+                              child: Text(
+                                '기기 오류: \\${snapshot.error}',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            );
+                          } else if (snapshot.hasData) {
+                            final devices = snapshot.data!;
+                            return Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(24),
+                                child: BackdropFilter(
+                                  filter: ImageFilter.blur(
+                                    sigmaX: 12,
+                                    sigmaY: 12,
+                                  ),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(24),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.12),
+                                      ),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 20,
+                                      horizontal: 12,
+                                    ),
+                                    child:
+                                        devices.isEmpty
+                                            ? SizedBox(
+                                              width: double.infinity,
+                                              child: Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(
+                                                    Icons.devices_other,
+                                                    color: Colors.white38,
+                                                    size: 40,
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  const Text(
+                                                    '기기를 추가해주세요.',
+                                                    style: TextStyle(
+                                                      color: Colors.white70,
+                                                      fontSize: 16,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  if (_rooms.isEmpty)
+                                                    const Padding(
+                                                      padding: EdgeInsets.only(
+                                                        top: 8.0,
+                                                      ),
+                                                      child: Text(
+                                                        '방을 먼저 추가하세요.',
+                                                        style: TextStyle(
+                                                          color: Colors.white54,
+                                                          fontSize: 13,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            )
+                                            : ListView.separated(
+                                              shrinkWrap: true,
+                                              itemCount: devices.length,
+                                              separatorBuilder:
+                                                  (_, __) => const SizedBox(
+                                                    height: 16,
+                                                  ),
+                                              itemBuilder: (context, i) {
+                                                final device =
+                                                    devices[i]['device']
+                                                        as Device;
+                                                final status =
+                                                    devices[i]['status']
+                                                        as String;
+                                                final isOn = status == 'ON';
+                                                return Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white
+                                                        .withOpacity(0.10),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          16,
+                                                        ),
+                                                  ),
+                                                  child: ListTile(
+                                                    leading: Container(
+                                                      width: 48,
+                                                      height: 48,
+                                                      decoration: BoxDecoration(
+                                                        color:
+                                                            isOn
+                                                                ? Color(
+                                                                  0xFF3971FF,
+                                                                )
+                                                                : Colors.white
+                                                                    .withOpacity(
+                                                                      0.18,
+                                                                    ),
+                                                        shape: BoxShape.circle,
+                                                        boxShadow: [
+                                                          if (isOn)
+                                                            BoxShadow(
+                                                              color: Color(
+                                                                0xFF3971FF,
+                                                              ).withOpacity(
+                                                                0.3,
+                                                              ),
+                                                              blurRadius: 12,
+                                                              offset: Offset(
+                                                                0,
+                                                                4,
+                                                              ),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                      child: Icon(
+                                                        Icons.air,
+                                                        color:
+                                                            isOn
+                                                                ? Colors.white
+                                                                : Color(
+                                                                  0xFF3971FF,
+                                                                ),
+                                                        size: 28,
+                                                      ),
+                                                    ),
+                                                    title: Text(
+                                                      device.name,
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    subtitle: Text(
+                                                      isOn ? '켜짐' : '꺼짐',
+                                                      style: TextStyle(
+                                                        color:
+                                                            isOn
+                                                                ? Color(
+                                                                  0xFF3971FF,
+                                                                )
+                                                                : Colors
+                                                                    .white70,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    trailing: const Icon(
+                                                      Icons.chevron_right,
+                                                      color: Colors.white,
+                                                    ),
+                                                    onTap: () async {
+                                                      final result = await Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                          builder:
+                                                              (
+                                                                _,
+                                                              ) => DeviceDetailScreen(
+                                                                device: Device(
+                                                                  id: device.id,
+                                                                  name:
+                                                                      device
+                                                                          .name,
+                                                                  isActive:
+                                                                      isOn,
+                                                                ),
+                                                              ),
+                                                        ),
+                                                      );
+                                                      if (result == true)
+                                                        _fetchDevices();
+                                                    },
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          } else {
+                            return const SizedBox();
+                          }
+                        },
                       ),
-                    ),
-                  );
-                },
-              ),
             ),
         ],
       ),

@@ -74,7 +74,7 @@ final ThemeData smartAirTheme = ThemeData(
     ),
   ),
   cardTheme: const CardTheme(
-    color: SmartAirColors.card,
+    color: Color(0xFF23272F),
     elevation: 8,
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.all(Radius.circular(24)),

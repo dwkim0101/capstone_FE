@@ -16,7 +16,7 @@ class SmartAirBottomNavBar extends StatelessWidget {
       height: 100,
       decoration: BoxDecoration(
         color: const Color(0xFF23272F).withOpacity(0.98),
-        // borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.18),

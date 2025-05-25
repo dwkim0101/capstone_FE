@@ -120,47 +120,57 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
       body:
           _loading
               ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
+              : Padding(
                 padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '실시간 데이터',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.sensor.name,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '실시간 데이터',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        if (_data != null)
+                          Text(_data.toString())
+                        else
+                          const Text('데이터 없음'),
+                        const SizedBox(height: 16),
+                        Text(
+                          '이력',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        if (_history != null)
+                          ..._history!.map((e) => Text(e.toString()))
+                        else
+                          const Text('이력 없음'),
+                        const SizedBox(height: 16),
+                        Text(
+                          '실시간 데이터(상태)',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        if (_status != null)
+                          Text(_status.toString())
+                        else
+                          const Text('상태 정보 없음'),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                Theme.of(context).colorScheme.error,
+                          ),
+                          onPressed: _deleteSensor,
+                          child: const Text('센서 삭제'),
+                        ),
+                      ],
                     ),
-                    if (_data != null)
-                      Text(_data.toString())
-                    else
-                      const Text('데이터 없음'),
-                    const SizedBox(height: 24),
-                    const Text(
-                      '이력',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    if (_history != null)
-                      ..._history!.map((e) => Text(e.toString()))
-                    else
-                      const Text('이력 없음'),
-                    const SizedBox(height: 24),
-                    const Text(
-                      '실시간 데이터(상태)',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    if (_status != null)
-                      Text(_status.toString())
-                    else
-                      const Text('상태 정보 없음'),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: Colors.red,
-                      ),
-                      onPressed: _deleteSensor,
-                      child: const Text('센서 삭제'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
     );

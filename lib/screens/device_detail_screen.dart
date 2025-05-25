@@ -3,13 +3,7 @@ import '../utils/api_constants.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/api_client.dart';
-
-class Device {
-  final String id;
-  final String name;
-  final bool isActive;
-  Device({required this.id, required this.name, required this.isActive});
-}
+import '../models/device.dart';
 
 class DeviceDetailScreen extends StatefulWidget {
   final Device device;
@@ -26,7 +20,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   @override
   void initState() {
     super.initState();
-    isActive = widget.device.isActive;
+    isActive = widget.device.isActive ?? false;
     _nameController = TextEditingController(text: widget.device.name);
   }
 
@@ -111,20 +105,16 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                     TextField(
                       controller: _nameController,
                       decoration: const InputDecoration(labelText: '기기 이름'),
+                      style: Theme.of(context).textTheme.bodyLarge,
                     ),
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: Colors.blue,
-                      ),
                       onPressed: _updateName,
                       child: const Text('이름 변경'),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: Colors.red,
+                        backgroundColor: Theme.of(context).colorScheme.error,
                       ),
                       onPressed: _deleteDevice,
                       child: const Text('기기 삭제'),
