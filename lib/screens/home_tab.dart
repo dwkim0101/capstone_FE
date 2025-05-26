@@ -11,6 +11,8 @@ import 'device_detail_screen.dart';
 import 'dart:async';
 import 'package:animated_flip_counter/animated_flip_counter.dart';
 import 'package:provider/provider.dart';
+import 'air_quality_detail_page.dart';
+import '../models/room.dart';
 
 class Score {
   final int value;
@@ -443,82 +445,133 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
             ),
           // 공기 점수 (화면 정중앙)
           Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '공기 점수',
-                  style: TextStyle(fontSize: 14, color: Colors.white),
-                ),
-                const SizedBox(height: 8),
-                if (_scoreValue == null)
-                  const Text(
-                    '점수 데이터 없음',
-                    style: TextStyle(color: Colors.white70),
-                  )
-                else
-                  Column(
-                    children: [
-                      AnimatedFlipCounter(
-                        duration: const Duration(milliseconds: 700),
-                        value: _scoreValue ?? 0,
-                        textStyle: TextStyle(
-                          fontSize: 54,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: 1.5,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withOpacity(0.5),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
+            child: GestureDetector(
+              onTap: () async {
+                if (selectedRoomId != null && rooms0.isNotEmpty) {
+                  final roomMap = rooms0.firstWhere(
+                    (r) => r['id'] == selectedRoomId,
+                    orElse: () => null,
+                  );
+                  if (roomMap == null) return;
+                  final room = Room.fromJson(roomMap);
+                  List sensors = [];
+                  if (roomMap.containsKey('sensors')) {
+                    sensors = roomMap['sensors'] ?? [];
+                  } else {
+                    // API로 센서 목록 조회
+                    try {
+                      final res = await authorizedRequest(
+                        'GET',
+                        Uri.parse(
+                          '${ApiConstants.baseUrl}/api/room/${room.id}/sensors',
+                        ),
+                      );
+                      if (res?.statusCode == 200) {
+                        final data = json.decode(res?.body ?? '[]');
+                        if (data is List) sensors = data;
+                      }
+                    } catch (_) {}
+                  }
+                  if (sensors.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (_) => AirQualityDetailPage(
+                              room: room,
+                              sensors: sensors,
                             ),
-                            Shadow(
-                              color: scoreColor(
-                                _scoreValue ?? 0,
-                              ).withOpacity(0.4),
-                              blurRadius: 18,
-                              offset: Offset(0, 0),
-                            ),
-                          ],
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '이 방에 등록된 센서가 없습니다.',
+                          style: TextStyle(color: Colors.white),
                         ),
                       ),
-                      SizedBox(height: 10),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 400),
-                        transitionBuilder:
-                            (child, animation) => FadeTransition(
-                              opacity: animation,
-                              child: child,
-                            ),
-                        child: Text(
-                          _scoreStatus ?? '',
-                          key: ValueKey(_scoreStatus),
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: statusColor(_scoreStatus ?? ''),
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.2,
+                    );
+                  }
+                }
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '공기 점수',
+                    style: TextStyle(fontSize: 14, color: Colors.white),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_scoreValue == null)
+                    const Text(
+                      '점수 데이터 없음',
+                      style: TextStyle(color: Colors.white70),
+                    )
+                  else
+                    Column(
+                      children: [
+                        AnimatedFlipCounter(
+                          duration: const Duration(milliseconds: 700),
+                          value: _scoreValue ?? 0,
+                          textStyle: TextStyle(
+                            fontSize: 54,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 1.5,
                             shadows: [
                               Shadow(
-                                color: Colors.black.withOpacity(0.4),
-                                blurRadius: 6,
-                                offset: Offset(0, 1),
+                                color: Colors.black.withOpacity(0.5),
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
                               ),
                               Shadow(
                                 color: scoreColor(
                                   _scoreValue ?? 0,
-                                ).withOpacity(0.3),
-                                blurRadius: 12,
+                                ).withOpacity(0.4),
+                                blurRadius: 18,
                                 offset: Offset(0, 0),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-              ],
+                        SizedBox(height: 10),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 400),
+                          transitionBuilder:
+                              (child, animation) => FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              ),
+                          child: Text(
+                            _scoreStatus ?? '',
+                            key: ValueKey(_scoreStatus),
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: statusColor(_scoreStatus ?? ''),
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.2,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withOpacity(0.4),
+                                  blurRadius: 6,
+                                  offset: Offset(0, 1),
+                                ),
+                                Shadow(
+                                  color: scoreColor(
+                                    _scoreValue ?? 0,
+                                  ).withOpacity(0.3),
+                                  blurRadius: 12,
+                                  offset: Offset(0, 0),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
             ),
           ),
           // UI
