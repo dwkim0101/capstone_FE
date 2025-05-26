@@ -97,7 +97,7 @@ class DeviceProvider extends ChangeNotifier {
     try {
       final res = await authorizedRequest(
         'GET',
-        Uri.parse(ApiConstants.thinqDeviceList(roomId)),
+        Uri.parse(ApiConstants.thinqDeviceRegisteredList(roomId)),
       );
       if (res?.statusCode == 200) {
         final List data = json.decode(res?.body ?? '[]');

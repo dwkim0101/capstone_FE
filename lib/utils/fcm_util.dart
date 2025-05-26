@@ -6,13 +6,23 @@ import 'dart:io';
 
 Future<void> getAndRegisterFcmToken() async {
   try {
-    // iOS 권한 요청
+    // iOS 권한 요청 및 APNS 토큰 대기
     if (Platform.isIOS) {
       await FirebaseMessaging.instance.requestPermission(
         alert: true,
         badge: true,
         sound: true,
       );
+      // APNS 토큰이 세팅될 때까지 최대 3초(10회) 대기
+      String? apnsToken;
+      int retry = 0;
+      while (apnsToken == null && retry < 10) {
+        apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+        if (apnsToken == null)
+          await Future.delayed(const Duration(milliseconds: 300));
+        retry++;
+      }
+      if (kDebugMode) print('[FCM] APNS 토큰: $apnsToken');
     }
     final fcmToken = await FirebaseMessaging.instance.getToken();
     if (fcmToken != null) {

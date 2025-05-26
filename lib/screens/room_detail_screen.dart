@@ -8,6 +8,8 @@ import '../models/sensor.dart';
 import '../models/room.dart';
 import '../utils/api_client.dart';
 import 'device_register_screen.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 Future<Room?> fetchRoomDetail(int roomId) async {
   final res = await authorizedRequest(
@@ -155,7 +157,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          '${widget.room.name} - 센서 목록',
+          widget.room.name,
           style: const TextStyle(color: Colors.white),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
@@ -184,70 +186,17 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         tooltip: '센서 추가',
         child: const Icon(Icons.add),
       ),
-      body: FutureBuilder<List<Sensor>?>(
-        future: _sensorFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Card(
-                  margin: EdgeInsets.zero,
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error, color: Colors.red, size: 48),
-                        const SizedBox(height: 16),
-                        Text(
-                          '센서 목록을 불러올 수 없습니다.',
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF3971FF),
-                            foregroundColor: Colors.white,
-                            textStyle: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                            minimumSize: const Size.fromHeight(48),
-                          ),
-                          onPressed: _refresh,
-                          child: const Text('다시 시도'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          } else if (snapshot.hasData) {
-            final sensors = snapshot.data!;
-            if (sensors.isEmpty) {
-              return const Center(child: Text('등록된 센서가 없습니다.'));
-            }
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+      body: Column(
+        children: [
+          if (widget.room.latitude != null && widget.room.longitude != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // const SizedBox(height: 20),
                   Text(
-                    widget.room.name,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge?.copyWith(color: Colors.white),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    '센서 목록',
+                    '위치 정보',
                     style: Theme.of(
                       context,
                     ).textTheme.titleMedium?.copyWith(color: Colors.white70),
@@ -257,31 +206,120 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                     thickness: 1,
                     height: 24,
                   ),
-                  ...sensors.map(
-                    (sensor) => SensorCard(
-                      sensor: sensor,
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (_) => SensorDetailScreen(
-                                  sensor: sensor,
-                                  roomId: widget.room.id,
-                                ),
+                  Card(
+                    color: Colors.grey[900],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: SizedBox(
+                      height: 180,
+                      child: FlutterMap(
+                        options: MapOptions(
+                          center: LatLng(
+                            widget.room.latitude!,
+                            widget.room.longitude!,
                           ),
-                        );
-                      },
+                          zoom: 16.0,
+                          interactiveFlags: InteractiveFlag.none,
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate:
+                                'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            subdomains: const ['a', 'b', 'c'],
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                width: 40,
+                                height: 40,
+                                point: LatLng(
+                                  widget.room.latitude!,
+                                  widget.room.longitude!,
+                                ),
+                                child: const Icon(
+                                  Icons.location_on,
+                                  color: Colors.red,
+                                  size: 40,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
-            );
-          } else {
-            return const Center(child: Text('알 수 없는 오류'));
-          }
-        },
+            ),
+          Expanded(
+            child: FutureBuilder<List<Sensor>?>(
+              future: _sensorFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return const Center(child: Text('센서 목록을 불러올 수 없습니다.'));
+                } else if (snapshot.hasData) {
+                  final sensors = snapshot.data!;
+                  if (sensors.isEmpty) {
+                    return const Center(child: Text('등록된 센서가 없습니다.'));
+                  }
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
+                        Text(
+                          '센서 목록',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                        const Divider(
+                          color: Colors.white24,
+                          thickness: 1,
+                          height: 24,
+                        ),
+                        ...sensors.map(
+                          (sensor) => SensorCard(
+                            sensor: sensor,
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => SensorDetailScreen(
+                                        sensor: sensor,
+                                        roomId: widget.room.id,
+                                      ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                } else {
+                  return const Center(child: Text('알 수 없는 오류'));
+                }
+              },
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    route?.addScopedWillPopCallback(() async {
+      final result = route.settings.arguments;
+      if (result == true) _refresh();
+      return true;
+    });
   }
 }

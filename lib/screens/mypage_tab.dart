@@ -66,14 +66,14 @@ class _MyPageTabState extends State<MyPageTab> {
                     style: const TextStyle(color: Colors.white70),
                   ),
                   const SizedBox(height: 24),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Colors.blue,
-                    ),
-                    onPressed: () {},
-                    child: const Text('로그아웃'),
-                  ),
+                  // ElevatedButton(
+                  //   style: ElevatedButton.styleFrom(
+                  //     foregroundColor: Colors.white,
+                  //     backgroundColor: Colors.blue,
+                  //   ),
+                  //   onPressed: () {},
+                  //   child: const Text('로그아웃'),
+                  // ),
                   const SizedBox(height: 8),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(

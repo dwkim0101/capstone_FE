@@ -484,7 +484,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                 ),
                               ),
                               subtitle: Text(
-                                n['body'] ?? '',
+                                n['message'] ?? n['body'] ?? '',
                                 style: TextStyle(color: Colors.white70),
                               ),
                               trailing: Text(
@@ -1261,7 +1261,7 @@ class NotificationListPage extends StatelessWidget {
                     ),
                   ),
                   subtitle: Text(
-                    n['body'] ?? '',
+                    n['message'] ?? n['body'] ?? '',
                     style: TextStyle(color: Colors.white70),
                   ),
                   trailing: Text(

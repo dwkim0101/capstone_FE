@@ -489,7 +489,7 @@ class _DeviceTabState extends State<DeviceTab>
                                   isLoading
                                       ? null
                                       : () async {
-                                        await Navigator.push(
+                                        final result = await Navigator.push(
                                           context,
                                           MaterialPageRoute(
                                             builder:
@@ -498,6 +498,7 @@ class _DeviceTabState extends State<DeviceTab>
                                                 ),
                                           ),
                                         );
+                                        if (result == true) _fetchDevices();
                                       },
                               child: Container(
                                 decoration: BoxDecoration(

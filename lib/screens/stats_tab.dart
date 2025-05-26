@@ -198,7 +198,7 @@ class _StatsTabState extends State<StatsTab>
   Widget build(BuildContext context) {
     super.build(context);
     return DefaultTabController(
-      length: 8,
+      length: 7,
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
@@ -218,7 +218,6 @@ class _StatsTabState extends State<StatsTab>
               Tab(text: '일별'),
               Tab(text: '주간'),
               Tab(text: '이상치'),
-              Tab(text: '예측'),
               Tab(text: '만족도'),
             ],
           ),
@@ -337,13 +336,6 @@ class _StatsTabState extends State<StatsTab>
                             description: '최근 7일간 점수 중 급격한 변화(이상치) 구간을 강조 표시',
                             child: _buildOutlierChart(),
                           ),
-                          // 예측
-                          _buildChartCard(
-                            title: '예측',
-                            description:
-                                'AI 기반 예측: 향후 5일간 점수 예측(실선: 실제, 점선: 예측)',
-                            child: _buildPredictionChart(),
-                          ),
                           // 만족도
                           _buildChartCard(
                             title: '만족도',
@@ -363,9 +355,7 @@ class _StatsTabState extends State<StatsTab>
                     _buildChartTab(_buildWeeklyChart(), '주간 트렌드'),
                     // 6. 이상치
                     _buildChartTab(_buildOutlierChart(), '이상치 감지'),
-                    // 7. 예측
-                    _buildChartTab(_buildPredictionChart(), '예측'),
-                    // 8. 만족도
+                    // 7. 만족도
                     _buildChartTab(_buildSatisfactionChart(), '만족도'),
                   ],
                 ),
@@ -505,8 +495,8 @@ class _StatsTabState extends State<StatsTab>
           mapController: _miniMapController,
           options: MapOptions(
             center: latLng,
-            zoom: 14.0,
-            interactiveFlags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+            zoom: 16.0,
+            interactiveFlags: InteractiveFlag.none,
           ),
           children: [
             TileLayer(
@@ -738,49 +728,6 @@ class _StatsTabState extends State<StatsTab>
     );
   }
 
-  Widget _buildPredictionChart() {
-    if (_selectedSensorSerial == null) {
-      return const Center(
-        child: Text('센서를 선택하세요', style: TextStyle(color: Colors.white70)),
-      );
-    }
-    return FutureBuilder<dynamic>(
-      future: fetchPredictedAirQuality(_selectedSensorSerial!),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingCard();
-        }
-        if (snapshot.hasError) {
-          return _buildErrorCard();
-        }
-        final data = snapshot.data;
-        if (data == null) {
-          return _buildNoDataCard();
-        }
-        final actualScores =
-            (data['actual'] as List?)
-                ?.map<double>((e) => (e ?? 0).toDouble())
-                .toList() ??
-            [];
-        final predictedScores =
-            (data['predicted'] as List?)
-                ?.map<double>((e) => (e ?? 0).toDouble())
-                .toList() ??
-            [];
-        final labels =
-            (data['labels'] as List?)
-                ?.map<String>((e) => e.toString())
-                .toList() ??
-            [];
-        return PredictionLineChart(
-          actualScores: actualScores,
-          predictedScores: predictedScores,
-          labels: labels,
-        );
-      },
-    );
-  }
-
   Widget _buildSatisfactionChart() {
     if (_selectedRoomId == null) {
       return const Center(
@@ -800,9 +747,14 @@ class _StatsTabState extends State<StatsTab>
         if (data == null) {
           return _buildNoDataCard();
         }
-        final satisfied = (data['satisfied'] ?? 0).toDouble();
-        final neutral = (data['neutral'] ?? 0).toDouble();
-        final dissatisfied = (data['dissatisfied'] ?? 0).toDouble();
+        if (data is! Map) {
+          // 에러 메시지 등 비정상 응답 처리
+          return _buildErrorCard();
+        }
+        final satisfied = double.tryParse(data['satisfied'].toString()) ?? 0.0;
+        final neutral = double.tryParse(data['neutral'].toString()) ?? 0.0;
+        final dissatisfied =
+            double.tryParse(data['dissatisfied'].toString()) ?? 0.0;
         return SatisfactionPieChart(
           satisfied: satisfied,
           neutral: neutral,
