@@ -22,12 +22,12 @@ Future<List<Room>?> fetchRoomList() async {
 }
 
 Future<List<Device>?> fetchDeviceList(int roomId) async {
-  print("[fetchDeviceList] GET: ${ApiConstants.thinqDeviceList(roomId)}");
+  print("[fetchDeviceList] GET: [36m/thinq/devices/registered/$roomId[0m");
   final res = await authorizedRequest(
     'GET',
-    Uri.parse(ApiConstants.thinqDeviceList(roomId)),
+    Uri.parse('${ApiConstants.baseUrl}/thinq/devices/registered/$roomId'),
   );
-  print("[fetchDeviceList] status: ${res?.statusCode}, body: ${res?.body}");
+  print("[fetchDeviceList] status: [36m");
   if (res?.statusCode == 200) {
     final List data = json.decode(res?.body ?? '[]');
     return data.map((e) => Device.fromJson(e)).toList();
@@ -410,10 +410,7 @@ class _DeviceTabState extends State<DeviceTab>
                   if (deviceProvider.loading) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final filteredDevices =
-                      deviceProvider.devices
-                          .where((d) => d.isRegistered == true)
-                          .toList();
+                  final filteredDevices = deviceProvider.devices;
                   if (filteredDevices.isEmpty) {
                     return Padding(
                       padding: const EdgeInsets.all(16),

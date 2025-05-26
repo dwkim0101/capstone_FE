@@ -32,7 +32,7 @@ class _DeviceRegisterScreenState extends State<DeviceRegisterScreen> {
     try {
       final res = await authorizedRequest(
         'GET',
-        Uri.parse(ApiConstants.thinqDeviceList(widget.roomId)),
+        Uri.parse('${ApiConstants.baseUrl}/thinq/devices/all/${widget.roomId}'),
       );
       if (res?.statusCode == 200) {
         final List data = json.decode(res?.body ?? '[]');
@@ -58,12 +58,12 @@ class _DeviceRegisterScreenState extends State<DeviceRegisterScreen> {
     if (_selectedDeviceId == null) return;
     setState(() => _loading = true);
     try {
-      final res = await authorizedRequest(
-        'POST',
-        Uri.parse(
-          ApiConstants.thinqDeviceUpdate(_selectedDeviceId!, widget.roomId),
-        ),
-      );
+      final device = _devices.firstWhere((d) => d.id == _selectedDeviceId);
+      final isRegistered = device.isRegistered == true;
+      final url =
+          '${ApiConstants.baseUrl}/thinq/${_selectedDeviceId!}/${widget.roomId}';
+      final method = isRegistered ? 'PUT' : 'POST';
+      final res = await authorizedRequest(method, Uri.parse(url));
       if (res?.statusCode == 200) {
         Navigator.pop(context, true);
       } else {
@@ -119,10 +119,10 @@ class _DeviceRegisterScreenState extends State<DeviceRegisterScreen> {
                     const SizedBox(height: 16),
                     Expanded(
                       child:
-                          _devices.where((d) => d.isRegistered != true).isEmpty
+                          _devices.isEmpty
                               ? Center(
                                 child: Text(
-                                  '등록 가능한 기기가 없습니다.',
+                                  '기기가 없습니다.',
                                   style: TextStyle(
                                     color: Colors.white70,
                                     fontSize: 16,
@@ -130,17 +130,11 @@ class _DeviceRegisterScreenState extends State<DeviceRegisterScreen> {
                                 ),
                               )
                               : ListView.separated(
-                                itemCount:
-                                    _devices
-                                        .where((d) => d.isRegistered != true)
-                                        .length,
+                                itemCount: _devices.length,
                                 separatorBuilder:
                                     (_, __) => const SizedBox(height: 12),
                                 itemBuilder: (context, idx) {
-                                  final device =
-                                      _devices
-                                          .where((d) => d.isRegistered != true)
-                                          .toList()[idx];
+                                  final device = _devices[idx];
                                   return Card(
                                     color: cardColor,
                                     shape: RoundedRectangleBorder(
@@ -163,6 +157,16 @@ class _DeviceRegisterScreenState extends State<DeviceRegisterScreen> {
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
+                                      subtitle:
+                                          device.isRegistered == true
+                                              ? Text(
+                                                '이미 등록됨',
+                                                style: TextStyle(
+                                                  color: Colors.green,
+                                                  fontSize: 13,
+                                                ),
+                                              )
+                                              : null,
                                       trailing: Radio<int>(
                                         value: device.id,
                                         groupValue: _selectedDeviceId,

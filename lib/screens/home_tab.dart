@@ -53,7 +53,7 @@ Future<Score> fetchRoomScore(int roomId) async {
 Future<List<Device>> fetchDeviceList(int roomId) async {
   final res = await authorizedRequest(
     'GET',
-    Uri.parse(ApiConstants.thinqDeviceList(roomId)),
+    Uri.parse('${ApiConstants.baseUrl}/thinq/devices/registered/$roomId'),
   );
   if (res?.statusCode == 200) {
     final List data = json.decode(res?.body ?? '[]');
@@ -84,10 +84,7 @@ Future<String> fetchDevicePowerStatus(int deviceId) async {
 Future<List<Map<String, dynamic>>> fetchDeviceListWithStatus(int roomId) async {
   final devices = await fetchDeviceList(roomId);
   final List<Map<String, dynamic>> result = [];
-  // isRegistered==true인 기기만 상태조회
-  final registeredDevices =
-      devices.where((d) => d.isRegistered == true).toList();
-  for (final device in registeredDevices) {
+  for (final device in devices) {
     final status = await fetchDevicePowerStatus(device.id);
     result.add({'device': device, 'status': status});
   }
@@ -646,10 +643,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                     if (deviceProvider.loading) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    final filteredDevices =
-                        deviceProvider.devices
-                            .where((d) => d.isRegistered == true)
-                            .toList();
+                    final filteredDevices = deviceProvider.devices;
                     if (filteredDevices.isEmpty) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(
