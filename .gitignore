@@ -71,3 +71,19 @@ api.json
 # 스마트에어 앱 API 관련 파일 무시
 lib/utils/api_*.dart
 lib/utils/api*.dart
+# Firebase iOS 설정 파일
+ios/Runner/GoogleService-Info.plist
+
+# Firebase Android 설정 파일
+android/app/google-services.json
+
+# Firebase web 설정 파일 (필요시)
+web/firebase-messaging-sw.js
+web/firebase-config.js
+
+# Firebase debug log
+firebase-debug.log
+
+firebase.json
+lib/utils/fcm_util.dart
+lib/firebase_options.dart

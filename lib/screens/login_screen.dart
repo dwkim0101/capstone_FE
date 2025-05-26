@@ -6,6 +6,7 @@ import 'signup_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screen.dart';
 import '../utils/api_client.dart';
+import '../utils/fcm_util.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -84,6 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
           if (accessToken == null) print('[DEBUG] accessToken이 null입니다!');
           if (refreshToken == null) print('[DEBUG] refreshToken이 null입니다!');
           await prefs.setBool('keepLogin', _keepLogin);
+          await getAndRegisterFcmToken();
           if (!mounted) return;
           Navigator.pushReplacement(
             context,

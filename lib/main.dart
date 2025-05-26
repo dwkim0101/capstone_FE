@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smartair_app/firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'theme/smartair_theme.dart';
 import 'screens/home_screen.dart';
@@ -10,8 +11,7 @@ import 'utils/fcm_util.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await getAndRegisterFcmToken();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(
     MultiProvider(
       providers: [ChangeNotifierProvider(create: (_) => DeviceProvider())],
@@ -72,6 +72,7 @@ class _SplashScreenState extends State<SplashScreen> {
     final keepLogin = prefs.getBool('keepLogin') ?? false;
     final accessToken = prefs.getString('accessToken');
     if (keepLogin && accessToken != null && accessToken.isNotEmpty) {
+      await getAndRegisterFcmToken();
       if (!mounted) return;
       Navigator.pushReplacement(
         context,

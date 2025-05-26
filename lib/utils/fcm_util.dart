@@ -2,9 +2,18 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'api_constants.dart';
 import 'api_client.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 
 Future<void> getAndRegisterFcmToken() async {
   try {
+    // iOS 권한 요청
+    if (Platform.isIOS) {
+      await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
     final fcmToken = await FirebaseMessaging.instance.getToken();
     if (fcmToken != null) {
       await registerFcmTokenToServer(fcmToken);
