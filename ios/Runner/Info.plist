@@ -47,5 +47,7 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>NSLocationWhenInUseUsageDescription</key>
+    	<string>이 앱은 지도를 위해 위치 접근 권한이 필요합니다.</string>
 	</dict>
 </plist>

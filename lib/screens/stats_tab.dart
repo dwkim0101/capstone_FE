@@ -10,6 +10,8 @@ import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
 import '../widgets/statistics_charts.dart';
 import 'login_screen.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 class StatsTab extends StatefulWidget {
   const StatsTab({super.key});
@@ -31,6 +33,8 @@ class _StatsTabState extends State<StatsTab>
   Map<String, dynamic>? _externalAirQuality;
   bool _externalLoading = false;
   String? _externalError;
+
+  final MapController _miniMapController = MapController();
 
   @override
   void initState() {
@@ -172,6 +176,12 @@ class _StatsTabState extends State<StatsTab>
       final Room? room = _findRoomById(_rooms, roomId);
       if (room != null && room.latitude != null && room.longitude != null) {
         _fetchExternalAirQuality(room.latitude, room.longitude);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _miniMapController.move(
+            LatLng(room.latitude!, room.longitude!),
+            14.0,
+          );
+        });
       } else {
         _externalAirQuality = null;
       }
@@ -277,6 +287,18 @@ class _StatsTabState extends State<StatsTab>
                                 }
                               },
                             ),
+                          const SizedBox(height: 16),
+                          Text(
+                            '방 위치',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // 지도 미니맵 (실내/실외 비교 위)
+                          _buildRoomMiniMap(),
                           const SizedBox(height: 16),
                           // 실내/실외 비교
                           _buildChartCard(
@@ -464,6 +486,48 @@ class _StatsTabState extends State<StatsTab>
               SizedBox(height: 260, child: chart),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoomMiniMap() {
+    final room = _findRoomById(_rooms, _selectedRoomId);
+    if (room == null || room.latitude == null || room.longitude == null) {
+      return const SizedBox();
+    }
+    final latLng = LatLng(room.latitude!, room.longitude!);
+    return Card(
+      color: Colors.grey[900],
+      child: SizedBox(
+        height: 180,
+        child: FlutterMap(
+          mapController: _miniMapController,
+          options: MapOptions(
+            center: latLng,
+            zoom: 14.0,
+            interactiveFlags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              subdomains: const ['a', 'b', 'c'],
+            ),
+            MarkerLayer(
+              markers: [
+                Marker(
+                  width: 40,
+                  height: 40,
+                  point: latLng,
+                  child: const Icon(
+                    Icons.location_on,
+                    color: Colors.red,
+                    size: 40,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

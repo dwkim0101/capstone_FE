@@ -39,6 +39,57 @@ Future<List<Sensor>?> fetchSensorList(int roomId) async {
   }
 }
 
+class SensorCard extends StatelessWidget {
+  final Sensor sensor;
+  final VoidCallback onTap;
+  const SensorCard({required this.sensor, required this.onTap, super.key});
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF3971FF), Color(0xFF6A82FB)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.sensors, color: Color(0xFF3971FF), size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  sensor.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.white38),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class RoomDetailScreen extends StatefulWidget {
   final Room room;
   const RoomDetailScreen({required this.room, super.key});
@@ -139,57 +190,41 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
             }
             return SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.room.name,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.titleLarge?.copyWith(color: Colors.white),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        '센서 목록',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(color: Colors.white70),
-                      ),
-                      const Divider(
-                        color: Colors.white24,
-                        thickness: 1,
-                        height: 24,
-                      ),
-                      ...sensors.map(
-                        (sensor) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: ListTile(
-                            leading: const Icon(
-                              Icons.sensors,
-                              color: Colors.white,
-                            ),
-                            title: Text(
-                              sensor.name,
-                              style: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(color: Colors.white),
-                            ),
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (_) => SensorDetailScreen(sensor: sensor),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.room.name,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleLarge?.copyWith(color: Colors.white),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  Text(
+                    '센서 목록',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: Colors.white70),
+                  ),
+                  const Divider(
+                    color: Colors.white24,
+                    thickness: 1,
+                    height: 24,
+                  ),
+                  ...sensors.map(
+                    (sensor) => SensorCard(
+                      sensor: sensor,
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SensorDetailScreen(sensor: sensor),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             );
           } else {
