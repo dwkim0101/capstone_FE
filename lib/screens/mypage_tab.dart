@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import '../utils/api_constants.dart';
 import 'package:flutter/material.dart';
 import '../utils/api_client.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'login_screen.dart';
 
 class MyPageTab extends StatefulWidget {
   const MyPageTab({super.key});
@@ -80,6 +82,24 @@ class _MyPageTabState extends State<MyPageTab> {
                     ),
                     onPressed: _showPatRegisterDialog,
                     child: const Text('설정'),
+                  ),
+                  const Spacer(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 24,
+                    ),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                        textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      icon: const Icon(Icons.logout),
+                      label: const Text('로그아웃'),
+                      onPressed: () => _logout(context),
+                    ),
                   ),
                 ],
               ),
@@ -163,6 +183,15 @@ class _MyPageTabState extends State<MyPageTab> {
         context,
       ).showSnackBar(const SnackBar(content: Text('PAT 등록/수정 실패')));
     }
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
   }
 }
 

@@ -107,6 +107,19 @@ Future<void> toggleDevice(int deviceId) async {
   }
 }
 
+Future<List<Map<String, dynamic>>> fetchNotifications() async {
+  final res = await authorizedRequest(
+    'GET',
+    Uri.parse('${ApiConstants.baseUrl}/notifications'),
+  );
+  if (res?.statusCode == 200) {
+    final List data = json.decode(res?.body ?? '[]');
+    return data.cast<Map<String, dynamic>>();
+  } else {
+    throw Exception('알림 불러오기 실패');
+  }
+}
+
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
 
@@ -396,10 +409,137 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
     }
   }
 
+  void _showNotificationsDialog() async {
+    try {
+      final notifications = await fetchNotifications();
+      showDialog(
+        context: context,
+        builder:
+            (context) => Dialog(
+              backgroundColor: const Color(0xFF222B45),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Container(
+                width: 340,
+                constraints: BoxConstraints(maxHeight: 480),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 18,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.notifications,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '알림',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        Spacer(),
+                        IconButton(
+                          icon: Icon(Icons.close, color: Colors.white54),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const Divider(color: Colors.white24, height: 24),
+                    if (notifications.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: Text(
+                            '알림이 없습니다.',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: notifications.length,
+                          separatorBuilder:
+                              (_, __) => Divider(color: Colors.white12),
+                          itemBuilder: (context, i) {
+                            final n = notifications[i];
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                n['title'] ?? '-',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Text(
+                                n['body'] ?? '',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                              trailing: Text(
+                                n['createdAt'] != null
+                                    ? n['createdAt']
+                                        .toString()
+                                        .substring(0, 16)
+                                        .replaceAll('T', ' ')
+                                    : '',
+                                style: TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+      );
+    } catch (e) {
+      showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              backgroundColor: Colors.grey[900],
+              title: Text('알림 오류', style: TextStyle(color: Colors.white)),
+              content: Text(
+                '알림을 불러올 수 없습니다.\n$e',
+                style: TextStyle(color: Colors.white70),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('닫기', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      // appBar: AppBar(
+      //   title: const Text('스마트에어', style: TextStyle(color: Colors.white)),
+      //   backgroundColor: Colors.transparent,
+      //   elevation: 0,
+      //   iconTheme: const IconThemeData(color: Colors.white),
+      // ),
       body: Stack(
         children: [
           Container(color: Colors.black),
@@ -593,9 +733,22 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                         ],
                       ),
                       Row(
-                        children: const [
-                          Icon(Icons.notifications, color: Colors.white),
-                          SizedBox(width: 16),
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => NotificationListPage(),
+                                ),
+                              );
+                            },
+                            child: Icon(
+                              Icons.notifications,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
                           Icon(Icons.person, color: Colors.white),
                         ],
                       ),
@@ -1048,6 +1201,87 @@ class _DeviceCard extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// 알림 전체화면 페이지
+class NotificationListPage extends StatelessWidget {
+  const NotificationListPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('알림', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: fetchNotifications(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                '알림을 불러올 수 없습니다.',
+                style: TextStyle(color: Colors.white70),
+              ),
+            );
+          } else if (snapshot.hasData) {
+            final notifications = snapshot.data!;
+            if (notifications.isEmpty) {
+              return Center(
+                child: Text(
+                  '알림이 없습니다.',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              );
+            }
+            return ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              itemCount: notifications.length,
+              separatorBuilder: (_, __) => Divider(color: Colors.white12),
+              itemBuilder: (context, i) {
+                final n = notifications[i];
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 8,
+                  ),
+                  title: Text(
+                    n['title'] ?? '-',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    n['body'] ?? '',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  trailing: Text(
+                    n['createdAt'] != null
+                        ? n['createdAt']
+                            .toString()
+                            .substring(0, 16)
+                            .replaceAll('T', ' ')
+                        : '',
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                );
+              },
+            );
+          } else {
+            return Center(
+              child: Text('알림 없음', style: TextStyle(color: Colors.white70)),
+            );
+          }
+        },
       ),
     );
   }

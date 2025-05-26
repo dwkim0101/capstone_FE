@@ -8,7 +8,12 @@ import 'login_screen.dart';
 
 class SensorDetailScreen extends StatefulWidget {
   final Sensor sensor;
-  const SensorDetailScreen({required this.sensor, super.key});
+  final int roomId;
+  const SensorDetailScreen({
+    required this.sensor,
+    required this.roomId,
+    super.key,
+  });
   @override
   State<SensorDetailScreen> createState() => _SensorDetailScreenState();
 }
@@ -128,15 +133,85 @@ class _SensorDetailScreenState extends State<SensorDetailScreen> {
   }
 
   Future<void> _deleteSensor() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => Dialog(
+            backgroundColor: const Color(0xFF222B45),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.redAccent,
+                    size: 40,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '센서 삭제',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '정말 이 센서를 삭제하시겠습니까?',
+                    style: TextStyle(color: Colors.white70, fontSize: 15),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          textStyle: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        child: Text('취소'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                        ),
+                        child: Text('삭제'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+    if (confirm != true) return;
     setState(() => _loading = true);
     final body = {
       'serialNumber': widget.sensor.serialNumber,
-      // roomId는 필요시 별도 전달(예: widget.sensor.roomId)
+      'roomId': widget.roomId,
     };
     try {
       await authorizedRequest(
         'DELETE',
-        Uri.parse(ApiConstants.sensorDelete),
+        Uri.parse(ApiConstants.sensorDeleteRoom),
         headers: {'Content-Type': 'application/json'},
         body: json.encode(body),
       );

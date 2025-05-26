@@ -111,6 +111,45 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
     });
   }
 
+  Future<void> _deleteRoom() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('방 삭제'),
+            content: Text('정말 이 방을 삭제하시겠습니까?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text('취소'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text('삭제'),
+              ),
+            ],
+          ),
+    );
+    if (confirm != true) return;
+    try {
+      final res = await authorizedRequest(
+        'DELETE',
+        Uri.parse(ApiConstants.roomDelete(widget.room.id)),
+      );
+      if (res?.statusCode == 204 || res?.statusCode == 200) {
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('방 삭제 실패: \\${res?.body}')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('방 삭제 오류: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -122,6 +161,13 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.delete, color: Colors.redAccent),
+            tooltip: '방 삭제',
+            onPressed: _deleteRoom,
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'add_sensor',
@@ -218,7 +264,11 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => SensorDetailScreen(sensor: sensor),
+                            builder:
+                                (_) => SensorDetailScreen(
+                                  sensor: sensor,
+                                  roomId: widget.room.id,
+                                ),
                           ),
                         );
                       },

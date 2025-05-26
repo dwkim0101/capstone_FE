@@ -57,11 +57,25 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   }
 
   Future<void> _deleteDevice() async {
-    // Swagger 명세에 기기 삭제 엔드포인트가 없으므로, 임시로 주석처리 또는 안내
-    print('[_deleteDevice] 기기 삭제 엔드포인트 없음 (Swagger 기준)');
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('기기 삭제 API가 지원되지 않습니다.')));
+    setState(() => _loading = true);
+    try {
+      final res = await authorizedRequest(
+        'DELETE',
+        Uri.parse(ApiConstants.thinqDeviceDelete(widget.device.id)),
+      );
+      if (res?.statusCode == 200) {
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('기기 삭제 실패: \\${res?.body}')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('기기 삭제 오류: $e')));
+    }
+    setState(() => _loading = false);
   }
 
   @override
