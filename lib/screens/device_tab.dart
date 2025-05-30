@@ -10,6 +10,7 @@ import 'dart:ui';
 import 'login_screen.dart';
 import 'device_register_screen.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 
 Future<List<Room>?> fetchRoomList() async {
   final res = await authorizedRequest('GET', Uri.parse(ApiConstants.roomList));
@@ -101,11 +102,17 @@ class _DeviceTabState extends State<DeviceTab>
   final List<Device> _devices = [];
   Future<List<Map<String, dynamic>>>? _deviceFutureWithStatus;
   final Map<int, bool> _deviceLoading = {}; // deviceId -> loading
+  Timer? _deviceStatusTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchRooms();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   Future<void> _fetchRooms() async {
@@ -153,8 +160,13 @@ class _DeviceTabState extends State<DeviceTab>
     if (roomId == null) return;
     setState(() {
       _selectedRoomId = roomId;
-      _fetchDevices();
+      _fetchDevices(); // 방 변경 시 즉시 갱신
     });
+    // 즉시 한 번 더 갱신 (로딩 표시)
+    Provider.of<DeviceProvider>(
+      context,
+      listen: false,
+    ).fetchDevices(_selectedRoomId!, showLoading: true);
   }
 
   Future<void> _showAddDeviceDialog() async {
@@ -410,7 +422,10 @@ class _DeviceTabState extends State<DeviceTab>
                   if (deviceProvider.loading) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final filteredDevices = deviceProvider.devices;
+                  final filteredDevices =
+                      _selectedRoomId != null
+                          ? deviceProvider.getDevices(_selectedRoomId!)
+                          : [];
                   if (filteredDevices.isEmpty) {
                     return Padding(
                       padding: const EdgeInsets.all(16),
@@ -591,7 +606,10 @@ class _DeviceTabState extends State<DeviceTab>
                                                     >(
                                                       context,
                                                       listen: false,
-                                                    ).toggleDevice(device.id);
+                                                    ).toggleDevice(
+                                                      device.id,
+                                                      _selectedRoomId!,
+                                                    );
                                                   },
                                           activeColor: Colors.white,
                                           activeTrackColor: Color(0xFF2351B5),

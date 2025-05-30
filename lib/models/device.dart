@@ -61,16 +61,14 @@ class Device {
 }
 
 class DeviceProvider extends ChangeNotifier {
-  List<Device> _devices = [];
+  final Map<int, List<Device>> _roomDevices = {};
   bool _loading = false;
   String? _error;
-  int? _roomId;
   final Map<int, bool> _deviceLoading = {}; // deviceId별 로딩 상태
 
-  List<Device> get devices => _devices;
+  List<Device> getDevices(int roomId) => _roomDevices[roomId] ?? [];
   bool get loading => _loading;
   String? get error => _error;
-  int? get roomId => _roomId;
   Map<int, bool> get deviceLoading => _deviceLoading;
 
   Future<String> fetchDevicePowerStatus(int deviceId) async {
@@ -89,11 +87,10 @@ class DeviceProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchDevices(int roomId) async {
-    _loading = true;
+  Future<void> fetchDevices(int roomId, {bool showLoading = true}) async {
+    if (showLoading) _loading = true;
     _error = null;
-    _roomId = roomId;
-    notifyListeners();
+    if (showLoading) notifyListeners();
     try {
       final res = await authorizedRequest(
         'GET',
@@ -108,18 +105,20 @@ class DeviceProvider extends ChangeNotifier {
               final status = await fetchDevicePowerStatus(d.id);
               return d.copyWith(isActive: status == 'ON');
             }).toList();
-        _devices = await Future.wait(futures);
+        _roomDevices[roomId] = await Future.wait(futures);
       } else {
         _error = '기기 목록 불러오기 실패';
+        _roomDevices[roomId] = [];
       }
     } catch (e) {
       _error = e.toString();
+      _roomDevices[roomId] = [];
     }
-    _loading = false;
+    if (showLoading) _loading = false;
     notifyListeners();
   }
 
-  Future<void> toggleDevice(int deviceId) async {
+  Future<void> toggleDevice(int deviceId, int roomId) async {
     _deviceLoading[deviceId] = true;
     notifyListeners();
     try {
@@ -130,9 +129,13 @@ class DeviceProvider extends ChangeNotifier {
       if (res?.statusCode == 200) {
         // 상태만 다시 조회해서 해당 기기만 갱신
         final status = await fetchDevicePowerStatus(deviceId);
-        final idx = _devices.indexWhere((d) => d.id == deviceId);
-        if (idx != -1) {
-          _devices[idx] = _devices[idx].copyWith(isActive: status == 'ON');
+        if (_roomDevices[roomId] != null) {
+          final idx = _roomDevices[roomId]!.indexWhere((d) => d.id == deviceId);
+          if (idx != -1) {
+            _roomDevices[roomId]![idx] = _roomDevices[roomId]![idx].copyWith(
+              isActive: status == 'ON',
+            );
+          }
         }
       } else {
         _error = '기기 제어 실패';
@@ -145,10 +148,9 @@ class DeviceProvider extends ChangeNotifier {
   }
 
   void clear() {
-    _devices = [];
+    _roomDevices.clear();
     _loading = false;
     _error = null;
-    _roomId = null;
     notifyListeners();
   }
 }

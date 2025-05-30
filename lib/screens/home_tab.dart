@@ -114,7 +114,13 @@ Future<List<Map<String, dynamic>>> fetchNotifications() async {
   );
   if (res?.statusCode == 200) {
     final List data = json.decode(res?.body ?? '[]');
-    return data.cast<Map<String, dynamic>>();
+    final list = data.cast<Map<String, dynamic>>();
+    list.sort((a, b) {
+      final aTime = DateTime.tryParse(a['createdAt'] ?? '') ?? DateTime(1970);
+      final bTime = DateTime.tryParse(b['createdAt'] ?? '') ?? DateTime(1970);
+      return bTime.compareTo(aTime); // 최신순 내림차순
+    });
+    return list;
   } else {
     throw Exception('알림 불러오기 실패');
   }
@@ -135,6 +141,7 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
   int? _scoreValue;
   String? _scoreStatus;
   late Timer scoreUpdateTimer;
+  Timer? _deviceStatusTimer;
 
   @override
   void initState() {
@@ -199,14 +206,16 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
       selectedRoomId = roomId;
       refreshRoomData();
     });
+    // 즉시 한 번 더 갱신 (로딩 표시)
+    Provider.of<DeviceProvider>(
+      context,
+      listen: false,
+    ).fetchDevices(selectedRoomId!, showLoading: true);
   }
 
   void refreshRoomData() {
     if (selectedRoomId == null) return;
     fetchAndSetScore();
-    // Provider로 기기 리스트 fetch
-    final deviceProvider = Provider.of<DeviceProvider>(context, listen: false);
-    deviceProvider.fetchDevices(selectedRoomId!);
   }
 
   Future<void> fetchUser() async {
@@ -849,7 +858,10 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                     if (deviceProvider.loading) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    final filteredDevices = deviceProvider.devices;
+                    final filteredDevices =
+                        selectedRoomId != null
+                            ? deviceProvider.getDevices(selectedRoomId!)
+                            : [];
                     if (filteredDevices.isEmpty) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(
@@ -945,7 +957,10 @@ class _HomeTabState extends State<HomeTab> with SingleTickerProviderStateMixin {
                                                 >(
                                                   context,
                                                   listen: false,
-                                                ).toggleDevice(device.id);
+                                                ).toggleDevice(
+                                                  device.id,
+                                                  selectedRoomId!,
+                                                );
                                               },
                                       child: AnimatedOpacity(
                                         duration: Duration(milliseconds: 200),
